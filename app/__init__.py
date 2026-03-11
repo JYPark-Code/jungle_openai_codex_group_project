@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
 
-from config import Config
+from config import Config, apply_runtime_env
 from app.routes.commits import commits_bp
 from app.models.db import init_app as init_db_app
 from app.routes.auth import auth_bp
@@ -22,6 +22,7 @@ def create_app(config_object=None, config_overrides=None):
 
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object or Config)
+    apply_runtime_env(app)
 
     default_database = os.path.join(app.instance_path, "study_dashboard.sqlite3")
     app.config["DATABASE"] = app.config.get("DATABASE") or default_database

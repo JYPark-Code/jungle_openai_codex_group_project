@@ -2,11 +2,12 @@ from app.models.db import (
     list_recommendations_by_repository_id,
     save_commit,
     save_commit_analysis_result,
+    save_issue,
     save_problem_judgement,
     upsert_repository_for_user,
     upsert_user,
 )
-from app.services.recommendation_service import calculate_weak_topics, generate_recommendations, get_recommendations
+from app.services.recommendation_service import calculate_weak_topics, generate_recommendations, get_recommendations, rank_weak_topics
 
 
 def ensure_recommendation_context(app):
@@ -160,3 +161,92 @@ def test_invalid_legacy_recommendation_is_filtered(app):
         data = get_recommendations(repository_id)
 
     assert data["recommendations"] == []
+
+
+def test_rank_weak_topics_treats_closed_issues_as_solved(app):
+    repository_id, commit_id = ensure_recommendation_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="closed-1",
+            issue_number=1,
+            title="[WEEK2] 문자열 - 광고",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="open-2",
+            issue_number=2,
+            title="[WEEK2] 문자열 - 압축",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=1,
+            problem_key="[WEEK2] 문자열 - 광고",
+            file_path="week2/problem-solving/문자열_광고.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=2,
+            problem_key="[WEEK2] 문자열 - 압축",
+            file_path="week2/problem-solving/문자열_압축.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+
+        ranking = rank_weak_topics(repository_id, limit=10)
+
+    string_topic = next(item for item in ranking if item["topic"] == "문자열")
+    assert string_topic["solved"] == 1
+    assert string_topic["total"] == 2
+    assert string_topic["solved_ratio"] == 0.5
+
+
+def test_rank_weak_topics_collapses_duplicate_issue_judgements(app):
+    repository_id, commit_id = ensure_recommendation_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="open-3",
+            issue_number=3,
+            title="[WEEK2] 구현 - 달팽이",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=3,
+            problem_key="[WEEK2] 구현 - 달팽이",
+            file_path="week2/basic/구현_달팽이.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=3,
+            problem_key="[WEEK2] 구현 - 달팽이",
+            file_path="week2/basic/구현_달팽이.py",
+            judgement_status="possibly_solved",
+            match_score=0.8,
+        )
+
+        ranking = rank_weak_topics(repository_id, limit=10)
+
+    impl_topic = next(item for item in ranking if item["topic"] == "구현")
+    assert impl_topic["total"] == 1
+    assert impl_topic["solved"] == 0
+    assert impl_topic["solved_ratio"] == 0.0

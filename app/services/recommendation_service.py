@@ -1,6 +1,7 @@
 from collections import Counter
 
 from app.models.db import (
+    get_issues_by_repository_id,
     list_problem_judgements_by_repository_id,
     list_recent_commit_topics_by_repository_id,
     list_recommendations_by_repository_id,
@@ -195,7 +196,12 @@ def calculate_weak_topics(repository_id: int, limit: int = 3) -> list[str]:
 
 
 def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
-    judgements = list_problem_judgements_by_repository_id(repository_id)
+    issues = get_issues_by_repository_id(repository_id)
+    issue_state_map = {item["issue_number"]: item["state"] for item in issues if item.get("issue_number") is not None}
+    judgements = _collapse_judgements(
+        list_problem_judgements_by_repository_id(repository_id),
+        issue_state_map,
+    )
     recent_topics = Counter(list_recent_commit_topics_by_repository_id(repository_id))
     category_stats = {
         category: {"total": 0, "solved": 0, "attempted_like": 0}
@@ -241,6 +247,33 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
 
     scored_topics.sort(key=lambda item: (-item["score"], item["topic"]))
     return scored_topics[:limit]
+
+
+def _collapse_judgements(judgements: list[dict], issue_state_map: dict[int, str]) -> list[dict]:
+    priority = {"attempted": 1, "possibly_solved": 2, "solved": 3}
+    best_by_issue = {}
+    extras = []
+
+    for judgement in judgements:
+        issue_number = judgement.get("issue_number")
+        if issue_number is None:
+            extras.append(dict(judgement))
+            continue
+
+        current = best_by_issue.get(issue_number)
+        next_status = judgement["judgement_status"]
+        if current is None or priority.get(next_status, 0) > priority.get(current["judgement_status"], 0):
+            best_by_issue[issue_number] = dict(judgement)
+
+    collapsed = []
+    for issue_number, judgement in best_by_issue.items():
+        normalized = dict(judgement)
+        if issue_state_map.get(issue_number) == "closed":
+            normalized["judgement_status"] = "solved"
+        collapsed.append(normalized)
+
+    collapsed.extend(extras)
+    return collapsed
 
 
 def generate_recommendations(repository_id: int, limit: int = 3) -> dict:

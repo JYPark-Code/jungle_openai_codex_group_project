@@ -68,7 +68,7 @@ mini-hackathon-web/
 
 ```bash
 python -m pip install -r requirements.txt
-python app.py
+python run.py
 ```
 
 실행 후 브라우저에서 아래 주소로 접속합니다.
@@ -96,6 +96,14 @@ REPO_NAME=JYPark-Code/SW-AI-W02-05
 
 - classic token을 사용하는 경우 `repo` 권한이 필요합니다.
 - 이 앱은 저장소 조회, Python 파일 읽기, 이슈 생성을 위해 GitHub API를 사용합니다.
+
+## 테스트 실행 방법
+
+```bash
+python -m pytest
+```
+
+현재는 API 서버 스모크 테스트와 공통 에러 응답 테스트가 포함되어 있습니다.
 
 ## 기대 효과
 

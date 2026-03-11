@@ -11,7 +11,10 @@ GITHUB_USER_API_URL = "https://api.github.com/user"
 
 
 def build_github_authorize_url(client_id: str, redirect_uri: str, state: str, scope: str) -> str:
-    return f"{GITHUB_AUTHORIZE_URL}?{urlencode({'client_id': client_id, 'redirect_uri': redirect_uri, 'scope': scope, 'state': state})}"
+    return (
+        f"{GITHUB_AUTHORIZE_URL}?"
+        f"{urlencode({'client_id': client_id, 'redirect_uri': redirect_uri, 'scope': scope, 'state': state})}"
+    )
 
 
 def exchange_code_for_access_token(code: str, client_id: str, client_secret: str, redirect_uri: str) -> str:

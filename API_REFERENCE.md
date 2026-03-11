@@ -1,15 +1,15 @@
-# API_REFERENCE
+# API Reference
 
-프론트엔드 연동용 백엔드 API 문서입니다.
+기준 백엔드: Flask + Session + SQLite  
+기본 주소: `http://127.0.0.1:5000`
 
-- Base URL: `http://localhost:5000`
-- 응답 형식: `application/json`
-- 인증 방식: `GitHub OAuth + Flask Session`
-- 세션 기반 인증이므로 FE 요청 시 쿠키를 함께 보내야 합니다.
+## 공통 규칙
 
-## 공통 응답 형식
+- 모든 응답은 JSON입니다.
+- 인증이 필요한 API는 GitHub OAuth 로그인 후 session cookie가 필요합니다.
+- 프론트엔드에서 호출할 때는 `credentials: "include"`를 사용해야 합니다.
 
-### 성공
+### 성공 응답
 
 ```json
 {
@@ -19,7 +19,7 @@
 }
 ```
 
-### 실패
+### 실패 응답
 
 ```json
 {
@@ -32,37 +32,26 @@
 }
 ```
 
-## 공통 에러 코드
-
-- `401 UNAUTHORIZED`
-- `404 REPOSITORY_NOT_SELECTED`
-- `404 REPOSITORY_NOT_FOUND`
-- `404 COMMIT_NOT_FOUND`
-- `404 COMMIT_REVIEW_NOT_FOUND`
-- `400 INVALID_REPOSITORY_PAYLOAD`
-- `400 INVALID_PROJECT_PAYLOAD`
-- `500 GITHUB_OAUTH_NOT_CONFIGURED`
-
----
-
 ## 1. 인증
 
 ### GitHub OAuth 흐름
 
 1. `GET /api/auth/github/login`
-2. 응답의 `authorization_url`로 GitHub 로그인
-3. GitHub가 `/api/auth/github/callback`으로 리다이렉트
-4. 서버가 세션 생성
-5. `GET /api/auth/me`로 사용자 확인
+2. GitHub 로그인
+3. `GET /api/auth/github/callback`
+4. session 생성
+5. `GET /api/auth/me`
 
 ### GET `/api/auth/github/login`
 
-- 설명: GitHub OAuth 시작 URL 생성
+- 설명: GitHub OAuth 시작 URL을 생성하거나 바로 리다이렉트합니다.
 - 인증 필요 여부: 아니오
-- 요청 파라미터: 없음
+- 요청 파라미터:
+  - `mode` optional, `json` 또는 `redirect`
+  - `next` optional, 로그인 성공 후 프론트엔드로 돌아갈 URL
 - 요청 body: 없음
 
-응답 예시:
+기본 JSON 응답 예시:
 
 ```json
 {
@@ -71,21 +60,33 @@
   "data": {
     "provider": "github",
     "authorization_url": "https://github.com/login/oauth/authorize?...",
-    "state": "random-state"
+    "state": "random-state",
+    "mode": "json",
+    "next_url": "http://127.0.0.1:3000/auth/callback"
   }
 }
 ```
 
+로컬 FE 권장 사용 예시:
+
+```text
+GET /api/auth/github/login?mode=redirect&next=http://127.0.0.1:3000/auth/callback
+```
+
+에러 케이스:
+
+- `500 GITHUB_OAUTH_NOT_CONFIGURED`
+
 ### GET `/api/auth/github/callback`
 
-- 설명: GitHub authorization code 교환 및 로그인 세션 생성
+- 설명: GitHub authorization code를 access token으로 교환하고 session을 생성합니다.
 - 인증 필요 여부: 아니오
 - 요청 파라미터:
   - `code`
   - `state`
 - 요청 body: 없음
 
-응답 예시:
+JSON 모드 응답 예시:
 
 ```json
 {
@@ -96,7 +97,7 @@
       "id": 1,
       "github_user_id": "2002",
       "github_login": "oauth-user",
-      "github_name": "OAuth User",
+      "github_name": "OAuth 사용자",
       "created_at": "2026-03-11T12:00:00+00:00",
       "updated_at": "2026-03-11T12:00:00+00:00"
     }
@@ -104,27 +105,76 @@
 }
 ```
 
+리다이렉트 모드 동작:
+
+- 성공 시: `FRONTEND_OAUTH_SUCCESS_URL` 또는 `next`로 `status=success`와 함께 이동
+- 실패 시: `FRONTEND_OAUTH_FAILURE_URL`로 `status=error&code=...`와 함께 이동
+
+에러 케이스:
+
+- `400 GITHUB_CODE_MISSING`
+- `400 GITHUB_STATE_MISMATCH`
+- `400 GITHUB_TOKEN_EXCHANGE_FAILED`
+- `400 GITHUB_USER_FETCH_FAILED`
+- `500 GITHUB_OAUTH_NOT_CONFIGURED`
+
 ### GET `/api/auth/me`
 
-- 설명: 현재 로그인 사용자 조회
+- 설명: 현재 로그인한 사용자 정보를 조회합니다.
 - 인증 필요 여부: 예
 - 요청 파라미터: 없음
 - 요청 body: 없음
 
----
+응답 예시:
+
+```json
+{
+  "success": true,
+  "message": "현재 로그인한 사용자 정보를 조회했습니다.",
+  "data": {
+    "user": {
+      "id": 1,
+      "github_user_id": "2002",
+      "github_login": "oauth-user",
+      "github_name": "OAuth 사용자"
+    }
+  }
+}
+```
+
+에러 케이스:
+
+- `401 UNAUTHORIZED`
+
+### POST `/api/auth/logout`
+
+- 설명: 현재 session을 종료합니다.
+- 인증 필요 여부: 아니오
+- 요청 파라미터: 없음
+- 요청 body: 없음
+
+응답 예시:
+
+```json
+{
+  "success": true,
+  "message": "로그아웃되었습니다.",
+  "data": {}
+}
+```
 
 ## 2. Repository API
 
 ### GET `/api/repositories`
 
-- 설명: 로그인한 GitHub 사용자의 저장소 목록 조회
+- 설명: 로그인한 사용자의 GitHub 저장소 목록을 조회합니다.
 - 인증 필요 여부: 예
 - 요청 파라미터: 없음
 - 요청 body: 없음
 
 ### POST `/api/repositories/select`
 
-- 설명: 분석 대상 저장소를 DB와 세션에 저장
+- 설명: 분석 대상 저장소를 선택하고 DB와 session에 저장합니다.
 - 인증 필요 여부: 예
 - 요청 파라미터: 없음
 - 요청 body:
@@ -141,23 +191,17 @@
 
 ### GET `/api/repositories/current`
 
-- 설명: 현재 세션 기준 저장소 조회
+- 설명: 현재 session 기준 선택된 저장소를 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
-
----
 
 ## 3. Sync API
 
 ### POST `/api/repositories/current/sync`
 
-- 설명: 현재 저장소의 GitHub issues / commits를 DB에 동기화
+- 설명: 현재 저장소의 issues와 commits를 GitHub에서 읽어 DB에 동기화합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
 
-응답 주요 필드:
+주요 응답 필드:
 
 - `new_issue_count`
 - `new_commit_count`
@@ -167,84 +211,33 @@
 
 ### GET `/api/repositories/current/sync-status`
 
-- 설명: 현재 저장소의 동기화 상태 조회
+- 설명: 현재 저장소의 마지막 동기화 상태를 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
-
----
 
 ## 4. Issue Template API
 
-운영 규칙:
-
-- `week2`는 이미 반영된 상태로 간주
-- `2026-03-13 금요일`부터 `week3`, 이후 매주 금요일마다 `week4`, `week5`로 자동 전환
-- `basic`, `common`은 필수
-- `problem-solving`은 기본적으로 필수
-- `problem-solving 상`, `Extra`는 선택
-- 현재 자동 추적 범위는 `week2~week5`
-
 ### GET `/api/issues/template-status`
 
-- 설명: CSV 템플릿 기준 이슈 상태 조회
+- 설명: CSV 템플릿 기준으로 현재 저장소의 이슈 상태를 계산합니다.
 - 인증 필요 여부: 예
 - 요청 파라미터:
-  - `week` (optional): 예 `week2`, `week3`
-- 요청 body: 없음
+  - `week` optional, 예: `week3`
 
-응답 주요 필드:
+주요 응답 필드:
 
 - `template_count`
 - `matched_count`
 - `missing_count`
 - `active_week`
-- `active_week_template_count`
 - `required_template_count`
 - `required_matched_count`
 - `required_progress`
-- `matched_issues`
 - `missing_issues`
-
-응답 예시:
-
-```json
-{
-  "success": true,
-  "message": "CSV 템플릿 기준 이슈 상태를 조회했습니다.",
-  "data": {
-    "template_count": 129,
-    "matched_count": 80,
-    "missing_count": 49,
-    "active_week": "week3",
-    "active_week_template_count": 20,
-    "required_template_count": 12,
-    "required_matched_count": 7,
-    "required_progress": 0.58,
-    "matched_issues": [
-      {
-        "title": "basic - 배열 연습",
-        "category": "basic",
-        "track_type": "basic",
-        "difficulty_level": "unspecified",
-        "requirement_level": "required",
-        "week_label": "week3",
-        "source_file": "week3_issues_complete.csv",
-        "github_issue_id": "100",
-        "issue_number": 1,
-        "state": "open"
-      }
-    ],
-    "missing_issues": []
-  }
-}
-```
 
 ### POST `/api/issues/create-missing`
 
-- 설명: 누락 issue를 GitHub에 일괄 생성
+- 설명: 누락된 템플릿 이슈를 GitHub에 일괄 생성하고 DB에 반영합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
 - 요청 body:
 
 ```json
@@ -253,63 +246,26 @@
 }
 ```
 
-`week`를 생략하면 서버 날짜 기준 자동 주차를 사용합니다.
-
-응답 예시:
-
-```json
-{
-  "success": true,
-  "message": "누락 이슈 생성을 완료했습니다.",
-  "data": {
-    "template_count": 129,
-    "matched_count": 129,
-    "missing_count": 0,
-    "active_week": "week3",
-    "required_template_count": 12,
-    "required_matched_count": 12,
-    "required_progress": 1.0,
-    "missing_issues": [],
-    "created_issues": [
-      {
-        "title": "problem-solving 하 - 그래프",
-        "category": "weekly",
-        "track_type": "problem-solving",
-        "difficulty_level": "low",
-        "requirement_level": "required",
-        "week_label": "week3",
-        "issue_number": 91,
-        "issue_url": "https://github.com/owner/repo/issues/91",
-        "state": "open"
-      }
-    ]
-  }
-}
-```
-
----
-
 ## 5. Commit Analysis API
 
 ### GET `/api/commits`
 
-- 설명: 동기화된 commit 목록 조회
+- 설명: 현재 저장소에 동기화된 commit 목록을 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
+
+### GET `/api/commits/{sha}`
+
+- 설명: 특정 commit 메타데이터를 조회합니다.
+- 인증 필요 여부: 예
 
 ### POST `/api/commits/{sha}/analyze-files`
 
-- 설명: 특정 commit의 changed files 분석
+- 설명: 특정 commit의 changed files를 기준으로 Python 파일과 문제 매칭 결과를 분석합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터:
-  - `sha`
-- 요청 body: 없음
 
-응답 주요 필드:
+주요 응답 필드:
 
 - `commit_sha`
-- `analyzed_at`
 - `analyzed_file_count`
 - `python_file_count`
 - `matched_problems`
@@ -317,87 +273,80 @@
 - `possibly_solved_count`
 - `solved_count`
 
----
-
 ## 6. Judge API
 
 ### POST `/api/commits/{sha}/judge`
 
-- 설명: commit 기준 풀이 상태 판정 저장
+- 설명: 분석 결과를 기준으로 attempted / possibly_solved / solved 상태를 갱신합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터:
-  - `sha`
-- 요청 body: 없음
 
 ### GET `/api/commits/{sha}/judge-result`
 
-- 설명: commit 기준 판정 결과 조회
+- 설명: 특정 commit의 판정 결과를 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터:
-  - `sha`
-- 요청 body: 없음
-
----
 
 ## 7. Review API
 
 ### POST `/api/commits/{sha}/review`
 
-- 설명: commit 기반 코드 리뷰 생성
+- 설명: 특정 commit의 Python 파일을 기준으로 코드 리뷰를 생성합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터:
-  - `sha`
-- 요청 body: 없음
 
 ### GET `/api/commits/{sha}/review`
 
-- 설명: 이미 생성된 commit 리뷰 조회
+- 설명: 저장된 commit 리뷰 결과를 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터:
-  - `sha`
-- 요청 body: 없음
-
----
 
 ## 8. Skill Map API
 
 ### GET `/api/repositories/current/skill-map`
 
-- 설명: 저장소 기준 Skill Map 조회
+- 설명: 저장소 단위 Skill Map 통계를 반환합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
 
----
+응답 예시:
+
+```json
+{
+  "success": true,
+  "message": "Skill Map을 조회했습니다.",
+  "data": {
+    "domains": [
+      {
+        "name": "탐색",
+        "total": 8,
+        "solved": 3
+      },
+      {
+        "name": "자료구조",
+        "total": 7,
+        "solved": 4
+      }
+    ]
+  }
+}
+```
 
 ## 9. Recommendation API
 
 ### POST `/api/repositories/current/recommendations/generate`
 
-- 설명: 약점 기반 추천 생성 및 저장
+- 설명: 약점 토픽을 계산하고 추천 문제를 생성합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
 
 ### GET `/api/repositories/current/recommendations`
 
-- 설명: 저장된 추천 조회
+- 설명: 저장된 추천 문제 목록을 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
-
----
 
 ## 10. Dashboard API
 
 ### GET `/api/dashboard/summary`
 
-- 설명: 메인 대시보드 요약 정보 조회
+- 설명: 운영 대시보드에 필요한 핵심 요약 정보를 반환합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
 
-응답 주요 필드:
+주요 응답 필드:
 
 - `status`
 - `active_week`
@@ -411,18 +360,14 @@
 - `recommendations`
 - `current_project`
 
----
-
 ## 11. MyPage API
 
 ### GET `/api/mypage/report`
 
-- 설명: 사용자 분석 리포트 전체 조회
+- 설명: 마이페이지 리포트 전체 데이터를 반환합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음
 
-응답 주요 필드:
+주요 응답 필드:
 
 - `repository`
 - `active_week`
@@ -443,29 +388,14 @@
 - `weak_topic_ranking`
 - `recommendations`
 
----
-
-## 운영용 Project API
+## 추가 운영 API
 
 ### POST `/api/repositories/current/projects/track`
 
-- 설명: 현재 주차 GitHub Project 추적 대상을 저장
+- 설명: 현재 주차 GitHub Project 추적 대상을 저장합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body:
-
-```json
-{
-  "week_label": "week3",
-  "project_title": "Week 3 Tracking",
-  "project_url": "https://github.com/orgs/example/projects/3",
-  "project_number": "3"
-}
-```
 
 ### GET `/api/repositories/current/projects/current`
 
-- 설명: 현재 추적 중인 GitHub Project 조회
+- 설명: 현재 추적 중인 GitHub Project 정보를 조회합니다.
 - 인증 필요 여부: 예
-- 요청 파라미터: 없음
-- 요청 body: 없음

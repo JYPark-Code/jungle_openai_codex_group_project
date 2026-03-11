@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from flask import Flask
+from flask_cors import CORS
 
 from config import Config
 from app.routes.commits import commits_bp
@@ -29,6 +30,18 @@ def create_app(config_object=None, config_overrides=None):
         app.config.update(config_overrides)
 
     os.makedirs(app.instance_path, exist_ok=True)
+
+    allowed_origins = [
+        origin.strip()
+        for origin in str(app.config.get("CORS_ALLOWED_ORIGINS", "")).split(",")
+        if origin.strip()
+    ]
+    if allowed_origins:
+        CORS(
+            app,
+            supports_credentials=True,
+            resources={r"/api/*": {"origins": allowed_origins}},
+        )
 
     init_db_app(app)
     register_error_handlers(app)

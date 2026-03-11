@@ -364,6 +364,26 @@ def get_repository_by_id(repository_id: int) -> dict | None:
     return row
 
 
+def get_latest_repository_by_user_id(user_id: int) -> dict | None:
+    return get_db().execute(
+        """
+        SELECT
+            id,
+            selected_by_user_id AS user_id,
+            owner_login AS owner,
+            repo_name AS name,
+            full_name,
+            created_at,
+            last_synced_at
+        FROM repositories
+        WHERE selected_by_user_id = ? AND is_active = 1
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        (user_id,),
+    ).fetchone()
+
+
 def get_issues_by_repository_id(repository_id: int) -> list[dict]:
     return get_db().execute(
         """

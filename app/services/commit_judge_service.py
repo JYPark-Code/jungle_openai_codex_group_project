@@ -17,6 +17,38 @@ from app.services.github_service import fetch_commit_changed_files
 from app.utils.errors import ApiError
 
 
+GENERIC_MATCH_TOKENS = {
+    "basic",
+    "extra",
+    "common",
+    "problem",
+    "solving",
+    "problem-solving",
+    "week",
+    "week2",
+    "week3",
+    "week4",
+    "week5",
+    "연습문제",
+    "난이도상",
+    "난이도중",
+    "난이도하",
+    "파이썬",
+    "문법",
+    "배열",
+    "문자열",
+    "완전탐색",
+    "재귀함수",
+    "백트래킹",
+    "정렬",
+    "정수론",
+    "구현",
+    "그래프",
+    "bfs",
+    "dfs",
+}
+
+
 def list_repository_commits(repository_id: int) -> list[dict]:
     from app.models.db import list_commits_by_repository_id
 
@@ -139,8 +171,14 @@ def get_repository_problem_summary(repository_id: int) -> dict:
 
 def normalize_problem_filename(file_path: str) -> str:
     stem = Path(file_path).stem
-    stem = re.sub(r"^난이도(상|중|하)_", "", stem)
-    stem = re.sub(r"_(브론즈|실버|골드|플래티넘|플래|다이아)\d*$", "", stem)
+    stem = re.sub(r"^(연습문제|난이도상|난이도중|난이도하|extra|basic|common)[_\-\s]+", "", stem, flags=re.IGNORECASE)
+    stem = re.sub(r"^문제[_\-\s]+", "", stem, flags=re.IGNORECASE)
+    stem = re.sub(
+        r"[_\-\s]+(브론즈\d*|실버\d*|골드\d*|플래\d*|플래티넘\d*|리트코드|leetcode|\d+)$",
+        "",
+        stem,
+        flags=re.IGNORECASE,
+    )
     normalized = re.sub(r"[_\-]+", " ", stem)
     normalized = re.sub(r"\s+", " ", normalized).strip().casefold()
     return normalized
@@ -148,37 +186,55 @@ def normalize_problem_filename(file_path: str) -> str:
 
 def normalize_issue_title(title: str) -> str:
     normalized = re.sub(r"\s+", " ", title.strip()).casefold()
-    normalized = normalized.replace("공통 - ", "").replace("basic - ", "")
+    normalized = re.sub(r"^\[(week\s*\d+|w\d+)\]\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = normalized.replace("공통 - ", "").replace("basic - ", "").replace("extra - ", "")
+    normalized = re.sub(r"^(난이도상|난이도중|난이도하)[_\-\s]+", "", normalized)
     return normalized
 
 
 def match_issue_by_filename(file_path: str, issues: list[dict]) -> dict:
     normalized_filename = normalize_problem_filename(file_path)
-    filename_tokens = set(normalized_filename.split())
+    filename_tokens = set(_tokenize_for_matching(normalized_filename))
 
     best_issue = None
     best_score = 0.0
-    best_reason = "관련 issue를 찾지 못했습니다."
+    best_reason = "연관된 issue를 찾지 못했습니다."
 
     for issue in issues:
         normalized_title = normalize_issue_title(issue["title"])
-        title_tokens = set(normalized_title.split())
+        title_tokens = set(_tokenize_for_matching(normalized_title))
         if not title_tokens:
             continue
 
         intersection_count = len(filename_tokens & title_tokens)
         denominator = max(len(filename_tokens), len(title_tokens), 1)
         score = intersection_count / denominator
+        meaningful_overlap = {
+            token for token in (filename_tokens & title_tokens)
+            if token not in GENERIC_MATCH_TOKENS
+        }
 
         if normalized_filename == normalized_title:
             score = 1.0
         elif normalized_filename in normalized_title or normalized_title in normalized_filename:
             score = max(score, 0.85)
+        elif not meaningful_overlap:
+            score = min(score, 0.15)
+        else:
+            score = max(score, 0.45 + (0.15 * min(len(meaningful_overlap), 2)))
 
         if score > best_score:
             best_score = score
             best_issue = issue
-            best_reason = f"title 토큰 유사도 {score:.2f}로 매칭되었습니다."
+            best_reason = f"title 토큰 유사도 {score:.2f}로 매칭했습니다."
+
+    if best_score < 0.45:
+        return {
+            "issue": None,
+            "score": round(best_score, 2),
+            "is_strong_match": False,
+            "reason": "파일명과 issue 제목의 의미 있는 겹침이 부족해 자동 매칭하지 않았습니다.",
+        }
 
     return {
         "issue": best_issue,
@@ -217,3 +273,9 @@ def summarize_judgements(judgements: list[dict]) -> dict:
         elif item["judgement_status"] == "solved":
             summary["solved_count"] += 1
     return summary
+
+
+def _tokenize_for_matching(value: str) -> list[str]:
+    normalized = re.sub(r"[\(\)\[\],]+", " ", value)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return [token for token in normalized.split(" ") if token]

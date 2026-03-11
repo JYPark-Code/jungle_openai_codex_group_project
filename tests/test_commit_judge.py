@@ -17,7 +17,7 @@ from app.services.commit_judge_service import (
 
 def ensure_commit_context(app):
     with app.app_context():
-        user_id = upsert_user("6006", "judge-user", "판정 사용자")
+        user_id = upsert_user("6006", "judge-user", "judge user")
         repository_id = upsert_repository_for_user(
             user_id=user_id,
             owner="JYPark-Code",
@@ -29,7 +29,7 @@ def ensure_commit_context(app):
         commit_id, _ = save_commit(
             repository_id=repository_id,
             sha="abc123",
-            message="문제 풀이 커밋",
+            message="solve matched problem",
             author_name="JYPark",
             committed_at="2026-03-11T12:00:00Z",
         )
@@ -69,7 +69,7 @@ def test_python_file_filtering_and_issue_matching(client, app, monkeypatch):
         "app.services.commit_judge_service.fetch_commit_changed_files",
         lambda owner, name, sha, access_token: {
             "sha": sha,
-            "message": "문제 풀이 커밋",
+            "message": "solve matched problem",
             "author_name": "JYPark",
             "committed_at": "2026-03-11T12:00:00Z",
             "files": [
@@ -119,6 +119,30 @@ def test_issue_matching_returns_strong_match():
     assert result["score"] >= 0.6
 
 
+def test_issue_matching_avoids_false_positive_when_only_generic_token_overlaps():
+    issues = [
+        {"title": "[WEEK2] 백트래킹 - N-Queen", "issue_number": 27},
+        {"title": "[WEEK2] 백트래킹 - 비숍", "issue_number": 30},
+    ]
+
+    result = match_issue_by_filename("week2/problem-solving/연습문제_백트래킹_옷조합_3.py", issues)
+
+    assert result["issue"] is None
+    assert result["is_strong_match"] is False
+
+
+def test_issue_matching_keeps_specific_backtracking_problem():
+    issues = [
+        {"title": "[WEEK2] 백트래킹 - N-Queen", "issue_number": 27},
+        {"title": "[WEEK2] 백트래킹 - Bishop", "issue_number": 30},
+    ]
+
+    result = match_issue_by_filename("week2/problem-solving/난이도상_백트래킹_Bishop_플래5.py", issues)
+
+    assert result["issue"]["issue_number"] == 30
+    assert result["score"] >= 0.6
+
+
 def test_analysis_result_is_saved_and_can_be_read(client, app, monkeypatch):
     repository_id, commit_id = ensure_commit_context(app)
     login_with_repository_and_user(client, repository_id)
@@ -138,7 +162,7 @@ def test_analysis_result_is_saved_and_can_be_read(client, app, monkeypatch):
         "app.services.commit_judge_service.fetch_commit_changed_files",
         lambda owner, name, sha, access_token: {
             "sha": sha,
-            "message": "문제 풀이 커밋",
+            "message": "solve matched problem",
             "author_name": "JYPark",
             "committed_at": "2026-03-11T12:00:00Z",
             "files": [
@@ -184,7 +208,7 @@ def test_commit_judge_result_and_repository_summary(client, app, monkeypatch):
         "app.services.commit_judge_service.fetch_commit_changed_files",
         lambda owner, name, sha, access_token: {
             "sha": sha,
-            "message": "문제 풀이 커밋",
+            "message": "solve matched problem",
             "author_name": "JYPark",
             "committed_at": "2026-03-11T12:00:00Z",
             "files": [

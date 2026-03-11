@@ -196,6 +196,73 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
     assert "domains" in skill_map_response.get_json()["data"]
 
 
+def test_commit_review_keeps_distinct_issue_titles_per_file(client, app, monkeypatch):
+    repository_id, commit_id = ensure_review_context(app)
+    login_for_review(client, repository_id)
+
+    with app.app_context():
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=1,
+            problem_key="[WEEK2] 백트래킹 - 비숍",
+            file_path="week2/problem-solving/난이도상_백트래킹_비숍_플래5.py",
+            judgement_status="attempted",
+            match_score=0.7,
+            matched_by_filename=True,
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=2,
+            problem_key="연습문제_백트래킹_옷조합_3.py",
+            file_path="week2/problem-solving/연습문제_백트래킹_옷조합_3.py",
+            judgement_status="attempted",
+            match_score=0.0,
+            matched_by_filename=False,
+        )
+
+    monkeypatch.setattr(
+        "app.services.code_review.fetch_commit_changed_files",
+        lambda owner, name, sha, access_token: {
+            "sha": sha,
+            "message": "add two backtracking solutions",
+            "author_name": "JYPark",
+            "committed_at": "2026-03-11T12:00:00Z",
+            "files": [
+                {
+                    "filename": "week2/problem-solving/난이도상_백트래킹_비숍_플래5.py",
+                    "status": "added",
+                    "additions": 20,
+                    "deletions": 0,
+                    "changes": 20,
+                },
+                {
+                    "filename": "week2/problem-solving/연습문제_백트래킹_옷조합_3.py",
+                    "status": "added",
+                    "additions": 20,
+                    "deletions": 0,
+                    "changes": 20,
+                },
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.code_review.fetch_file_content_at_ref",
+        lambda owner, name, file_path, ref, access_token: "def solve():\n    return 1\n",
+    )
+
+    response = client.post("/api/commits/review123/review")
+    payload = response.get_json()["data"]
+
+    titles = {item["file_path"]: item["issue_title"] for item in payload["files"]}
+
+    assert response.status_code == 200
+    assert titles["week2/problem-solving/난이도상_백트래킹_비숍_플래5.py"] == "[WEEK2] 백트래킹 - 비숍"
+    assert titles["week2/problem-solving/연습문제_백트래킹_옷조합_3.py"] == "연습문제_백트래킹_옷조합_3.py"
+    assert payload["line_comments"][0]["title"] != payload["line_comments"][1]["title"]
+
+
 def test_code_review_ignores_docstring_when_estimating_complexity():
     source = '''"""
 for i in range(n):

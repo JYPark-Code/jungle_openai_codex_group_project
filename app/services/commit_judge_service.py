@@ -139,6 +139,8 @@ def get_repository_problem_summary(repository_id: int) -> dict:
 
 def normalize_problem_filename(file_path: str) -> str:
     stem = Path(file_path).stem
+    stem = re.sub(r"^난이도(상|중|하)_", "", stem)
+    stem = re.sub(r"_(브론즈|실버|골드|플래티넘|플래|다이아)\d*$", "", stem)
     normalized = re.sub(r"[_\-]+", " ", stem)
     normalized = re.sub(r"\s+", " ", normalized).strip().casefold()
     return normalized

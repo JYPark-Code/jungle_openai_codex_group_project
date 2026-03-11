@@ -6,7 +6,7 @@ from app.models.db import (
     upsert_repository_for_user,
     upsert_user,
 )
-from app.services.recommendation_service import calculate_weak_topics, generate_recommendations
+from app.services.recommendation_service import calculate_weak_topics, generate_recommendations, get_recommendations
 
 
 def ensure_recommendation_context(app):
@@ -141,3 +141,22 @@ def test_recommendation_api_returns_saved_items(client, app):
     assert "weak_topics" in generate_response.get_json()["data"]
     assert list_response.status_code == 200
     assert "recommendations" in list_response.get_json()["data"]
+
+
+def test_invalid_legacy_recommendation_is_filtered(app):
+    repository_id, _commit_id = ensure_recommendation_context(app)
+
+    with app.app_context():
+        from app.models.db import save_recommendation
+
+        save_recommendation(
+            repository_id=repository_id,
+            topic="구현",
+            problem_title="상하좌우",
+            problem_url="https://www.acmicpc.net/",
+            source_site="baekjoon",
+            reason="legacy",
+        )
+        data = get_recommendations(repository_id)
+
+    assert data["recommendations"] == []

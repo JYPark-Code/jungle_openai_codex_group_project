@@ -1,4 +1,4 @@
-from flask import Blueprint, current_app
+from flask import Blueprint, current_app, redirect, url_for
 
 from app.models.db import database_health, get_table_names
 from app.utils.responses import success_response
@@ -9,13 +9,7 @@ api_bp = Blueprint("api", __name__)
 
 @api_bp.get("/")
 def root():
-    return success_response(
-        data={
-            "service": "jungle-algorithm-ops-dashboard-api",
-            "environment": current_app.config["ENV_NAME"],
-        },
-        message="API 서버가 정상 실행 중입니다.",
-    )
+    return redirect("/login")
 
 
 @api_bp.get("/api/health")

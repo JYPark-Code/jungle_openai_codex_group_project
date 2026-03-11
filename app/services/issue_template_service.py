@@ -13,6 +13,10 @@ from app.services.github_service import create_issue_with_access_token
 
 DEFAULT_TEMPLATE_DIRECTORY = Path("resources/csv")
 WEEK3_START_DATE = date(2026, 3, 13)
+KNOWN_CHALLENGE_TITLES = {
+    "문자열 - 광고",
+    "정수론 - 제곱 ㄴㄴ 수",
+}
 
 
 def load_issue_templates(template_directory: str | Path = DEFAULT_TEMPLATE_DIRECTORY) -> list[dict]:
@@ -29,15 +33,19 @@ def load_issue_templates(template_directory: str | Path = DEFAULT_TEMPLATE_DIREC
                 continue
 
             category = classify_issue_title(title)
+            track_type = infer_track_type(title, content, category)
+            difficulty_level = infer_difficulty_level(title, content)
+            requirement_level = infer_requirement_level(title, content, category, track_type, difficulty_level)
+
             templates.append(
                 {
                     "title": title,
                     "content": content,
                     "normalized_title": normalize_title(title),
                     "category": category,
-                    "track_type": infer_track_type(title, content, category),
-                    "difficulty_level": infer_difficulty_level(title, content),
-                    "requirement_level": infer_requirement_level(title, content, category),
+                    "track_type": track_type,
+                    "difficulty_level": difficulty_level,
+                    "requirement_level": requirement_level,
                     "week_label": week_label,
                     "source_file": csv_path.name,
                 }
@@ -88,14 +96,19 @@ def build_template_status(
 
     selected_week = active_week or determine_active_week(templates, matched)
     active_templates = [item for item in templates if item["week_label"] == selected_week] if selected_week else []
-    required_active_templates = [item for item in active_templates if item["requirement_level"] == "required"]
-    matched_required_titles = {
-        item["title"]
-        for item in matched
-        if item["week_label"] == selected_week and item["requirement_level"] == "required"
-    }
     active_matched = [item for item in matched if item["week_label"] == selected_week] if selected_week else []
     active_missing = [item for item in missing if item["week_label"] == selected_week] if selected_week else []
+
+    required_active_templates = [item for item in active_templates if is_required_coding_issue(item)]
+    matched_required_titles = {
+        item["title"]
+        for item in active_matched
+        if is_required_coding_issue(item)
+    }
+    challenge_active_issues = [
+        item for item in (active_matched + active_missing)
+        if is_challenge_issue(item)
+    ]
 
     required_progress = (
         len(matched_required_titles) / len(required_active_templates)
@@ -112,6 +125,7 @@ def build_template_status(
         "required_template_count": len(required_active_templates),
         "required_matched_count": len(matched_required_titles),
         "required_progress": round(required_progress, 2),
+        "challenge_issue_count": len(challenge_active_issues),
         "matched_issues": active_matched if selected_week else matched,
         "missing_issues": active_missing if selected_week else missing,
         "all_matched_issues": matched,
@@ -196,15 +210,15 @@ def normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", normalized).casefold()
 
 
+KNOWN_CHALLENGE_NORMALIZED_TITLES = {normalize_title(title) for title in KNOWN_CHALLENGE_TITLES}
+
+
 def classify_issue_title(title: str) -> str:
     lowered = title.strip().casefold()
     if lowered.startswith("공통") or lowered.startswith("common"):
         return "common"
     if lowered.startswith("basic"):
         return "basic"
-    week_match = re.match(r"week\s*\d+|w\d+|week\d+", lowered)
-    if week_match:
-        return "weekly"
     return "weekly"
 
 
@@ -221,13 +235,23 @@ def infer_track_type(title: str, content: str, category: str) -> str:
     return "problem-solving"
 
 
-def infer_requirement_level(title: str, content: str, category: str) -> str:
+def infer_requirement_level(
+    title: str,
+    content: str,
+    category: str,
+    track_type: str,
+    difficulty_level: str,
+) -> str:
     lowered = normalize_title(f"{title} {content}")
-    if category in {"common", "basic"}:
+    normalized_title = normalize_title(title)
+    if category == "common":
+        return "excluded"
+    if category == "basic":
         return "required"
-    if "extra" in lowered or "선택" in lowered:
+    if normalized_title in KNOWN_CHALLENGE_NORMALIZED_TITLES:
         return "optional"
-    difficulty_level = infer_difficulty_level(title, content)
+    if track_type == "extra" or "선택" in lowered:
+        return "optional"
     if difficulty_level == "high":
         return "optional"
     return "required"
@@ -235,13 +259,25 @@ def infer_requirement_level(title: str, content: str, category: str) -> str:
 
 def infer_difficulty_level(title: str, content: str) -> str:
     lowered = normalize_title(f"{title} {content}")
-    if re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
+    if "난이도하" in lowered or re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
         return "low"
-    if re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):
+    if "난이도중" in lowered or re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):
         return "medium"
-    if re.search(r"(^|[\s\-_[(])상($|[\s\-_)\]])", lowered):
+    if "난이도상" in lowered or re.search(r"(^|[\s\-_[(])상($|[\s\-_)\]])", lowered):
         return "high"
     return "unspecified"
+
+
+def is_common_issue(item: dict) -> bool:
+    return item.get("track_type") == "common" or item.get("category") == "common"
+
+
+def is_challenge_issue(item: dict) -> bool:
+    return item.get("requirement_level") == "optional" or item.get("track_type") == "extra"
+
+
+def is_required_coding_issue(item: dict) -> bool:
+    return not is_common_issue(item) and not is_challenge_issue(item)
 
 
 def extract_week_label(filename: str) -> str:

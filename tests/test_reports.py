@@ -120,6 +120,7 @@ def test_report_aggregation(app, monkeypatch):
 
 
 def test_status_evaluation_rules():
+    assert evaluate_learning_status(1.0, 1.0, 3) == "Good"
     assert evaluate_learning_status(0.8, 0.7, 1) == "Good"
     assert evaluate_learning_status(0.3, 0.2, 4) == "Risk"
     assert evaluate_learning_status(0.6, 0.45, 3) == "Watch"

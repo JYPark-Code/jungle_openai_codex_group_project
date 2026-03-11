@@ -307,19 +307,20 @@ def upsert_repository_for_user(
     existing = connection.execute(
         """
         SELECT id FROM repositories
-        WHERE selected_by_user_id = ? AND full_name = ?
+        WHERE full_name = ?
         """,
-        (user_id, full_name),
+        (full_name,),
     ).fetchone()
 
     if existing:
         connection.execute(
             """
             UPDATE repositories
-            SET github_repo_id = ?, owner_login = ?, repo_name = ?, default_branch = ?, updated_at = ?
+            SET github_repo_id = ?, owner_login = ?, repo_name = ?, default_branch = ?,
+                selected_by_user_id = ?, is_active = 1, updated_at = ?
             WHERE id = ?
             """,
-            (github_repo_id, owner, name, default_branch, timestamp, existing["id"]),
+            (github_repo_id, owner, name, default_branch, user_id, timestamp, existing["id"]),
         )
         connection.commit()
         return existing["id"]

@@ -99,6 +99,35 @@ def test_select_repository_does_not_create_duplicate(app):
     assert first_id == second_id
 
 
+def test_select_repository_reuses_existing_row_from_another_user(app):
+    with app.app_context():
+        from app.models.db import upsert_user
+
+        first_user_id = upsert_user("3003", "repo-user", "레포 사용자")
+        second_user_id = upsert_user("3004", "repo-user-2", "두번째 사용자")
+
+        first_repository_id = upsert_repository_for_user(
+            user_id=first_user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="123",
+            default_branch="main",
+        )
+        second_repository_id = upsert_repository_for_user(
+            user_id=second_user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="123",
+            default_branch="main",
+        )
+        saved_repository = get_repository_by_id(second_repository_id)
+
+    assert first_repository_id == second_repository_id
+    assert saved_repository["user_id"] == second_user_id
+
+
 def test_current_repository_returns_selected_repository(client, app):
     ensure_logged_in_user(app)
     login_session(client)

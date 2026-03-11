@@ -10,6 +10,38 @@ from app.services.skill_map_service import CATEGORY_KEYWORDS, match_categories_f
 
 
 RECOMMENDATION_POOL = {
+    "구현": [
+        {
+            "title": "상하좌우",
+            "topic": "구현",
+            "url": "https://www.acmicpc.net/problem/14503",
+            "source": "baekjoon",
+        }
+    ],
+    "문자열": [
+        {
+            "title": "문자열 압축",
+            "topic": "문자열",
+            "url": "https://school.programmers.co.kr/learn/courses/30/lessons/60057",
+            "source": "programmers",
+        }
+    ],
+    "사고력": [
+        {
+            "title": "아이디어 회의",
+            "topic": "사고력",
+            "url": "https://projecteuler.net/problem=1",
+            "source": "project-euler",
+        }
+    ],
+    "시뮬레이션": [
+        {
+            "title": "로봇 청소기",
+            "topic": "시뮬레이션",
+            "url": "https://www.acmicpc.net/problem/14503",
+            "source": "baekjoon",
+        }
+    ],
     "재귀": [
         {
             "title": "재귀함수가 뭔가요?",
@@ -18,12 +50,20 @@ RECOMMENDATION_POOL = {
             "source": "baekjoon",
         }
     ],
+    "수학": [
+        {
+            "title": "소수 찾기",
+            "topic": "수학",
+            "url": "https://www.acmicpc.net/problem/1978",
+            "source": "baekjoon",
+        }
+    ],
     "그래프": [
         {
-            "title": "The Maze",
+            "title": "유기농 배추",
             "topic": "그래프",
-            "url": "https://leetcode.com/problems/the-maze/",
-            "source": "leetcode",
+            "url": "https://www.acmicpc.net/problem/1012",
+            "source": "baekjoon",
         }
     ],
     "배열": [
@@ -76,7 +116,7 @@ RECOMMENDATION_POOL = {
     ],
     "정렬": [
         {
-            "title": "K번째 수",
+            "title": "K번째수",
             "topic": "정렬",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42748",
             "source": "programmers",
@@ -100,18 +140,18 @@ RECOMMENDATION_POOL = {
     ],
     "그리디": [
         {
-            "title": "Greedy Gift Givers",
+            "title": "큰 수 만들기",
             "topic": "그리디",
-            "url": "https://projecteuler.net/",
-            "source": "project-euler",
+            "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42883",
+            "source": "programmers",
         }
     ],
     "다이나믹프로그래밍": [
         {
-            "title": "N-Queens",
+            "title": "정수 삼각형",
             "topic": "다이나믹프로그래밍",
-            "url": "https://leetcode.com/problems/n-queens/",
-            "source": "leetcode",
+            "url": "https://school.programmers.co.kr/learn/courses/30/lessons/43105",
+            "source": "programmers",
         }
     ],
     "완전탐색": [
@@ -132,10 +172,10 @@ RECOMMENDATION_POOL = {
     ],
     "최단경로": [
         {
-            "title": "Network Delay Time",
+            "title": "최단경로",
             "topic": "최단경로",
-            "url": "https://leetcode.com/problems/network-delay-time/",
-            "source": "leetcode",
+            "url": "https://www.acmicpc.net/problem/1753",
+            "source": "baekjoon",
         }
     ],
     "탐색": [
@@ -144,22 +184,6 @@ RECOMMENDATION_POOL = {
             "topic": "탐색",
             "url": "https://leetcode.com/problems/binary-search/",
             "source": "leetcode",
-        }
-    ],
-    "문자열": [
-        {
-            "title": "문자열 압축",
-            "topic": "문자열",
-            "url": "https://school.programmers.co.kr/learn/courses/30/lessons/60057",
-            "source": "programmers",
-        }
-    ],
-    "구현": [
-        {
-            "title": "상하좌우",
-            "topic": "구현",
-            "url": "https://www.acmicpc.net/",
-            "source": "baekjoon",
         }
     ],
 }
@@ -190,7 +214,7 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
 
     scored_topics = []
     for category, stats in category_stats.items():
-        if stats["total"] == 0 and recent_topics[category] > 0:
+        if stats["total"] == 0 and recent_topics[category] == 0:
             continue
 
         solved_ratio = stats["solved"] / stats["total"] if stats["total"] else 0.0
@@ -201,8 +225,8 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
         base_penalty = 1 - solved_ratio
         score = base_penalty + attempted_gap + recency_penalty
 
-        if stats["total"] == 0 and recent_topics[category] == 0:
-            score += 0.15
+        if score <= 0:
+            continue
 
         scored_topics.append(
             {
@@ -221,7 +245,11 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
 
 def generate_recommendations(repository_id: int, limit: int = 3) -> dict:
     weak_topics = calculate_weak_topics(repository_id, limit=limit)
-    existing_urls = {item["url"] for item in list_recommendations_by_repository_id(repository_id)}
+    existing_urls = {
+        item["url"]
+        for item in list_recommendations_by_repository_id(repository_id)
+        if is_valid_recommendation(item)
+    }
     created_recommendations = []
 
     for topic in weak_topics:
@@ -257,9 +285,25 @@ def get_recommendations(repository_id: int) -> dict:
     weak_topics = calculate_weak_topics(repository_id)
     return {
         "weak_topics": weak_topics,
-        "recommendations": list_recommendations_by_repository_id(repository_id),
+        "recommendations": [
+            item
+            for item in list_recommendations_by_repository_id(repository_id)
+            if is_valid_recommendation(item)
+        ],
     }
 
 
 def build_recommendation_reason(topic: str) -> str:
-    return f"{topic} 유형의 solved 비율이 낮아 보강이 필요합니다."
+    return f"{topic} 유형 풀이 비중이 낮아 보강이 필요합니다."
+
+
+def is_valid_recommendation(item: dict) -> bool:
+    url = str(item.get("url", "")).strip()
+    title = str(item.get("title", "")).strip()
+    if not url:
+        return False
+    if url == "https://www.acmicpc.net/":
+        return False
+    if title == "상하좌우":
+        return False
+    return True

@@ -211,3 +211,80 @@ def test_current_week_project_tracking_api(client, app):
 
     assert project is not None
     assert project["project_title"] == "Week 3 Tracking"
+
+
+def test_common_issue_is_excluded_from_required_progress(tmp_path):
+    make_csv(
+        tmp_path,
+        "week2_issues_complete.csv",
+        [
+            ("공통 - 이번 주 업무", ""),
+            ("basic - 배열 연습", ""),
+            ("문자열 - 광고", ""),
+            ("Extra - Word Search", ""),
+        ],
+    )
+
+    templates = load_issue_templates(tmp_path)
+    info = {item["title"]: item for item in templates}
+
+    assert info["공통 - 이번 주 업무"]["requirement_level"] == "excluded"
+    assert info["basic - 배열 연습"]["requirement_level"] == "required"
+    assert info["문자열 - 광고"]["requirement_level"] == "optional"
+    assert info["Extra - Word Search"]["requirement_level"] == "optional"
+
+
+def test_report_treats_high_difficulty_filename_as_challenge(app, monkeypatch):
+    repository_id, commit_id = ensure_ops_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="299",
+            issue_number=29,
+            title="[WEEK2] 문자열 - 광고",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=29,
+            problem_key="[WEEK2] 문자열 - 광고",
+            file_path="week2/난이도상_문자열_광고_플래4.py",
+            judgement_status="possibly_solved",
+            match_score=1.0,
+            matched_by_filename=True,
+        )
+
+    monkeypatch.setattr(
+        "app.services.report_service.build_template_status",
+        lambda repository_id: {
+            "active_week": "week2",
+            "template_count": 1,
+            "matched_count": 1,
+            "missing_count": 0,
+            "required_template_count": 0,
+            "required_matched_count": 0,
+            "required_progress": 0.0,
+            "matched_issues": [],
+            "missing_issues": [],
+            "all_matched_issues": [],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.get_recommendations",
+        lambda repository_id: {"weak_topics": [], "recommendations": []},
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.rank_weak_topics",
+        lambda repository_id, limit=5: [],
+    )
+
+    with app.app_context():
+        report = build_user_report(repository_id)
+
+    assert report["challenge_count"] == 1
+    assert report["solved_count"] == 0
+    assert report["attempted_count"] == 0

@@ -16,7 +16,7 @@ from app.services.commit_judge_service import (
     list_repository_commits,
 )
 from app.services.github_service import fetch_commit_changed_files, fetch_file_content_at_ref
-from app.services.issue_template_service import build_template_status
+from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue, normalize_title
 from app.services.recommendation_service import generate_recommendations
 from app.services.report_service import build_user_report
 from app.utils.errors import ApiError
@@ -27,6 +27,7 @@ STATUS_PRIORITY = {
     "attempted": 1,
     "possibly_solved": 2,
     "solved": 3,
+    "challenge": 4,
 }
 
 STATUS_COPY = {
@@ -34,6 +35,7 @@ STATUS_COPY = {
     "attempted": "풀고 있는 문제",
     "possibly_solved": "풀고 있는 문제",
     "solved": "푼 문제",
+    "challenge": "도전 문제",
 }
 
 RADAR_DOMAIN_ORDER = ["자료구조", "탐색", "수학", "구현", "정렬"]
@@ -60,7 +62,7 @@ def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc"
         "repository": repository,
         "report": report,
         "progress_cards": [
-            {"label": "전체 문제", "value": report["total_issue_count"]},
+            {"label": "전체 필수 문제", "value": report["total_issue_count"]},
             {"label": "푼 문제", "value": report["solved_count"]},
             {"label": "남은 문제", "value": report["remaining_issue_count"]},
         ],
@@ -80,6 +82,9 @@ def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc"
 def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dict:
     issues = get_issues_by_repository_id(repository["id"])
     judgements = list_problem_judgements_by_repository_id(repository["id"])
+    template_status = build_template_status(repository["id"])
+    issue_meta_map = _build_issue_meta_map(template_status)
+    challenge_issue_numbers = _build_challenge_issue_numbers(judgements)
     best_status_by_issue = _build_issue_status_map(judgements)
 
     current_week_key = _pick_current_week_key(issues)
@@ -89,11 +94,18 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
         if current_week_key and _extract_week_key(issue["title"]) != current_week_key:
             continue
 
-        status_key = best_status_by_issue.get(issue["issue_number"])
-        if not status_key and issue["state"] == "closed":
-            status_key = "solved"
-        if not status_key:
-            status_key = "not_started"
+        issue_meta = issue_meta_map.get(issue["issue_number"], {})
+        if is_common_issue(issue_meta):
+            continue
+
+        if issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta):
+            status_key = "challenge"
+        else:
+            status_key = best_status_by_issue.get(issue["issue_number"])
+            if not status_key and issue["state"] == "closed":
+                status_key = "solved"
+            if not status_key:
+                status_key = "not_started"
 
         item = {
             "issue_number": issue["issue_number"],
@@ -115,6 +127,7 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
             if item["status_key"] in {"attempted", "possibly_solved"}
         ],
         "done": [item for item in current_week_issues if item["status_key"] == "solved"],
+        "challenge": [item for item in current_week_issues if item["status_key"] == "challenge"],
     }
 
     return {
@@ -126,6 +139,7 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
             "todo": len(columns["todo"]),
             "in_progress": len(columns["in_progress"]),
             "done": len(columns["done"]),
+            "challenge": len(columns["challenge"]),
         },
     }
 
@@ -139,7 +153,7 @@ def build_profile_page_data(repository: dict) -> dict:
         "report": report,
         "radar": radar,
         "status_rules": [
-            "Good: 주차 진행률 높고 약점이 적음",
+            "Good: 주차 진행률이 높고 약점이 적음",
             "Watch: 진행은 되지만 유형 편중이 있음",
             "Risk: 진행률이 낮거나 약점 영역이 많음",
         ],
@@ -315,6 +329,27 @@ def _build_issue_status_map(judgements: list[dict]) -> dict[int, str]:
     return best_status_by_issue
 
 
+def _build_issue_meta_map(template_status: dict) -> dict[int, dict]:
+    meta_map = {}
+    for item in template_status.get("all_matched_issues", []):
+        issue_number = item.get("issue_number")
+        if issue_number is not None:
+            meta_map[issue_number] = item
+    return meta_map
+
+
+def _build_challenge_issue_numbers(judgements: list[dict]) -> set[int]:
+    challenge_issue_numbers = set()
+    for item in judgements:
+        issue_number = item.get("issue_number")
+        file_path = item.get("file_path", "") or ""
+        if issue_number is None:
+            continue
+        if file_path.split("/")[-1].startswith("난이도상_"):
+            challenge_issue_numbers.add(issue_number)
+    return challenge_issue_numbers
+
+
 def _build_issue_url(full_name: str, issue_number: int | None) -> str:
     return f"https://github.com/{full_name}/issues/{issue_number}" if issue_number else "#"
 
@@ -358,7 +393,7 @@ def _format_display_date(value: str | None) -> str:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return value
-    return f"{parsed.year}년 {parsed.month}월 {parsed.day}일"
+    return f"{parsed.year}.{parsed.month:02d}.{parsed.day:02d}"
 
 
 def _format_display_datetime(value: str | None) -> str:
@@ -368,19 +403,23 @@ def _format_display_datetime(value: str | None) -> str:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return value
-    return f"{parsed.year}년 {parsed.month}월 {parsed.day}일 {parsed.hour:02d}:{parsed.minute:02d}"
+    return f"{parsed.year}.{parsed.month:02d}.{parsed.day:02d} {parsed.hour:02d}:{parsed.minute:02d}"
 
 
 def _build_template_status_note(template_status: dict) -> str:
     active_total = template_status.get("active_week_template_count", 0)
     active_connected = len(template_status.get("matched_issues", []))
     overall_connected = template_status.get("matched_count", 0)
+    challenge_count = template_status.get("challenge_issue_count", 0)
 
     if not active_total:
         return "현재 주차에 해당하는 템플릿이 없습니다."
     if not active_connected and overall_connected:
         return "전체 연결 이슈는 있지만 현재 주차에 매칭된 이슈가 없습니다."
-    return f"현재 주차 연결 {active_connected}건, 전체 연결 {overall_connected}건입니다."
+    return (
+        f"현재 주차 연결 {active_connected}건, 전체 연결 {overall_connected}건이며, "
+        f"도전 문제는 {challenge_count}건입니다."
+    )
 
 
 def _sort_issue_activity(items: list[dict], activity_sort: str) -> None:

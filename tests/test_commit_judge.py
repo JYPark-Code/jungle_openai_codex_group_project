@@ -103,7 +103,7 @@ def test_python_file_filtering_and_issue_matching(client, app, monkeypatch):
 
 
 def test_file_name_normalization():
-    assert normalize_problem_filename("week2/난이도상_문자열_광고_플래4.py") == "난이도상 문자열 광고 플래4"
+    assert normalize_problem_filename("week2/난이도상_문자열_광고_플래4.py") == "문자열 광고"
 
 
 def test_issue_matching_returns_strong_match():
@@ -252,3 +252,7 @@ def test_repository_problem_summary_counts_all_statuses(app):
     assert summary["possibly_solved_count"] == 1
     assert summary["solved_count"] == 1
     assert summary["total_count"] == 3
+
+
+def test_high_difficulty_filename_normalization():
+    assert normalize_problem_filename("week2/난이도상_문자열_광고_플래4.py") == "문자열 광고"

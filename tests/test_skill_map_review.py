@@ -9,6 +9,7 @@ from app.services.skill_map_service import (
     build_skill_map,
     match_categories_from_text,
 )
+from app.services.code_review import estimate_time_complexity, evaluate_code_structure
 
 
 def ensure_review_context(app):
@@ -173,3 +174,46 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
     assert skill_map_response.status_code == 200
     assert "review_summary" in review_response.get_json()["data"]
     assert "domains" in skill_map_response.get_json()["data"]
+
+
+def test_code_review_ignores_docstring_when_estimating_complexity():
+    source = '''"""
+for i in range(n):
+    for j in range(n):
+        pass
+"""
+
+def solve():
+    for value in range(10):
+        print(value)
+'''
+
+    complexity = estimate_time_complexity(source, ["구현"])
+    assert complexity == "O(N) 내외"
+
+
+def test_code_review_does_not_overpraise_single_long_function():
+    source = """
+def solve():
+    total = 0
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    for number in range(10):
+        total += number
+    return total
+"""
+
+    structure = evaluate_code_structure(source)
+    assert "함수 분리가 되어 있어 구조가 비교적 명확합니다." != structure

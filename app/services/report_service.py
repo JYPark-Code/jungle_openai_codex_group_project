@@ -9,7 +9,7 @@ from app.models.db import (
     list_problem_judgements_by_repository_id,
     save_analysis_report,
 )
-from app.services.issue_template_service import build_template_status
+from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue
 from app.services.recommendation_service import get_recommendations, rank_weak_topics
 from app.services.skill_map_service import build_skill_map
 
@@ -45,13 +45,18 @@ def build_user_report(repository_id: int, report_scope: str = "mypage_report") -
     attempted_count = tracked_summary["attempted_count"]
     possibly_solved_count = tracked_summary["possibly_solved_count"]
     extra_practice_count = tracked_summary["extra_practice_count"]
+    challenge_count = tracked_summary["challenge_count"]
+
     week_progress = template_status.get("required_progress")
     if week_progress is None:
-        template_count = template_status.get("template_count", 0)
-        matched_count = template_status.get("matched_count", 0)
+        template_count = template_status.get("required_template_count", 0)
+        matched_count = template_status.get("required_matched_count", 0)
+        if not template_count:
+            template_count = template_status.get("template_count", 0)
+            matched_count = template_status.get("matched_count", 0)
         week_progress = (matched_count / template_count) if template_count else 0.0
-    solved_ratio = solved_count / max(solved_count + attempted_count, 1)
 
+    solved_ratio = solved_count / max(solved_count + attempted_count, 1)
     status = evaluate_learning_status(
         week_progress=week_progress,
         solved_ratio=solved_ratio,
@@ -68,6 +73,7 @@ def build_user_report(repository_id: int, report_scope: str = "mypage_report") -
         "attempted_count": attempted_count,
         "possibly_solved_count": possibly_solved_count,
         "extra_practice_count": extra_practice_count,
+        "challenge_count": challenge_count,
         "total_issue_count": tracked_summary["total_issue_count"],
         "remaining_issue_count": tracked_summary["remaining_issue_count"],
         "week_progress": round(week_progress, 2),
@@ -103,6 +109,10 @@ def get_cached_report(repository_id: int, report_scope: str) -> dict | None:
 def build_tracked_problem_summary(repository_id: int) -> dict:
     issues = get_issues_by_repository_id(repository_id)
     judgements = list_problem_judgements_by_repository_id(repository_id)
+    template_status = build_template_status(repository_id)
+    issue_meta_map = _build_issue_meta_map(template_status)
+    challenge_issue_numbers = _build_challenge_issue_numbers(judgements)
+
     tracked = [item for item in judgements if item.get("issue_number") is not None]
     extra = [item for item in judgements if item.get("issue_number") is None]
 
@@ -122,11 +132,18 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
         "attempted_count": 0,
         "possibly_solved_count": 0,
         "extra_practice_count": len(extra),
-        "total_issue_count": len(issues),
+        "challenge_count": 0,
+        "total_issue_count": 0,
         "remaining_issue_count": 0,
     }
 
     for issue in issues:
+        if _is_common_or_challenge_issue(issue, issue_meta_map, challenge_issue_numbers):
+            if issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta_map.get(issue["issue_number"], {})):
+                summary["challenge_count"] += 1
+            continue
+
+        summary["total_issue_count"] += 1
         status = best_status_by_issue.get(issue["issue_number"])
         if not status and issue["state"] == "closed":
             status = "solved"
@@ -141,10 +158,29 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
         else:
             summary["remaining_issue_count"] += 1
 
+    if not issues:
+        summary["total_issue_count"] = len(best_status_by_issue)
+        for issue_number, status in best_status_by_issue.items():
+            if issue_number in challenge_issue_numbers:
+                summary["challenge_count"] += 1
+                summary["total_issue_count"] -= 1
+                continue
+            if status == "solved":
+                summary["solved_count"] += 1
+            elif status == "possibly_solved":
+                summary["possibly_solved_count"] += 1
+                summary["attempted_count"] += 1
+            elif status == "attempted":
+                summary["attempted_count"] += 1
+            else:
+                summary["remaining_issue_count"] += 1
+
     return summary
 
 
 def evaluate_learning_status(week_progress: float, solved_ratio: float, weak_topic_count: int) -> str:
+    if week_progress >= 0.95 and solved_ratio >= 0.8:
+        return "Good"
     if week_progress >= 0.7 and solved_ratio >= 0.6 and weak_topic_count <= 2:
         return "Good"
     if week_progress < 0.4 or (solved_ratio < 0.35 and weak_topic_count >= 3):
@@ -153,10 +189,10 @@ def evaluate_learning_status(week_progress: float, solved_ratio: float, weak_top
 
 
 def build_ai_summary(status: str, week_progress: float, solved_ratio: float, weak_topics: list[str]) -> str:
-    weak_text = ", ".join(weak_topics[:3]) if weak_topics else "특별히 두드러진 약점이 아직 없습니다"
+    weak_text = ", ".join(weak_topics[:3]) if weak_topics else "뚜렷한 약점 영역이 아직 없습니다"
     return (
         f"현재 상태는 {status}입니다. "
-        f"필수 과제 진행률은 {week_progress:.0%}, tracked solved 비율은 {solved_ratio:.0%}이며, "
+        f"필수 과제 진행률은 {week_progress:.0%}, solved 비율은 {solved_ratio:.0%}이며, "
         f"우선 보강이 필요한 영역은 {weak_text}입니다."
     )
 
@@ -177,3 +213,41 @@ def build_area_analysis(skill_map: dict) -> list[dict]:
             }
         )
     return analysis
+
+
+def _build_issue_meta_map(template_status: dict) -> dict[int, dict]:
+    meta_map = {}
+    for item in template_status.get("all_matched_issues", []):
+        issue_number = item.get("issue_number")
+        if issue_number is not None:
+            meta_map[issue_number] = item
+    return meta_map
+
+
+def _build_challenge_issue_numbers(judgements: list[dict]) -> set[int]:
+    challenge_issue_numbers = set()
+    for item in judgements:
+        issue_number = item.get("issue_number")
+        file_path = item.get("file_path", "") or ""
+        if issue_number is None:
+            continue
+        if _is_high_difficulty_file(file_path):
+            challenge_issue_numbers.add(issue_number)
+    return challenge_issue_numbers
+
+
+def _is_common_or_challenge_issue(issue: dict, issue_meta_map: dict[int, dict], challenge_issue_numbers: set[int]) -> bool:
+    issue_number = issue.get("issue_number")
+    meta = issue_meta_map.get(issue_number, {})
+    if is_common_issue(meta):
+        return True
+    if is_challenge_issue(meta):
+        return True
+    if issue_number in challenge_issue_numbers:
+        return True
+    return False
+
+
+def _is_high_difficulty_file(file_path: str) -> bool:
+    file_name = file_path.split("/")[-1]
+    return file_name.startswith("난이도상_")

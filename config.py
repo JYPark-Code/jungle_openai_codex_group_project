@@ -13,7 +13,7 @@ class Config:
     GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
     GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
     GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://127.0.0.1:5000/api/auth/github/callback")
-    GITHUB_WEB_REDIRECT_URI = os.getenv("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5050/auth/github/callback")
+    GITHUB_WEB_REDIRECT_URI = os.getenv("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5000/auth/github/callback")
     GITHUB_OAUTH_SCOPE = os.getenv("GITHUB_OAUTH_SCOPE", "read:user")
     FRONTEND_OAUTH_SUCCESS_URL = os.getenv("FRONTEND_OAUTH_SUCCESS_URL", "http://127.0.0.1:3000/auth/callback")
     FRONTEND_OAUTH_FAILURE_URL = os.getenv("FRONTEND_OAUTH_FAILURE_URL", "http://127.0.0.1:3000/login")
@@ -64,7 +64,7 @@ def apply_runtime_env(app) -> None:
         ),
         GITHUB_WEB_REDIRECT_URI=os.getenv(
             "GITHUB_WEB_REDIRECT_URI",
-            app.config.get("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5050/auth/github/callback"),
+            app.config.get("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5000/auth/github/callback"),
         ),
         GITHUB_OAUTH_SCOPE=os.getenv(
             "GITHUB_OAUTH_SCOPE",

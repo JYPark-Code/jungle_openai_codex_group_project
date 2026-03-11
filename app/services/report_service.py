@@ -138,15 +138,19 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
     }
 
     for issue in issues:
-        if _is_common_or_challenge_issue(issue, issue_meta_map, challenge_issue_numbers):
-            if issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta_map.get(issue["issue_number"], {})):
-                summary["challenge_count"] += 1
+        issue_number = issue["issue_number"]
+        issue_meta = issue_meta_map.get(issue_number, {})
+        status = best_status_by_issue.get(issue_number)
+        if issue["state"] == "closed":
+            status = "solved"
+
+        if is_common_issue(issue_meta):
             continue
 
         summary["total_issue_count"] += 1
-        status = best_status_by_issue.get(issue["issue_number"])
-        if issue["state"] == "closed":
-            status = "solved"
+        if _is_challenge_issue_number(issue_number, issue_meta, challenge_issue_numbers) and status != "solved":
+            summary["challenge_count"] += 1
+            continue
 
         if status == "solved":
             summary["solved_count"] += 1
@@ -161,7 +165,7 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
     if not issues:
         summary["total_issue_count"] = len(best_status_by_issue)
         for issue_number, status in best_status_by_issue.items():
-            if issue_number in challenge_issue_numbers:
+            if _is_challenge_issue_number(issue_number, issue_meta_map.get(issue_number, {}), challenge_issue_numbers) and status != "solved":
                 summary["challenge_count"] += 1
                 summary["total_issue_count"] -= 1
                 continue
@@ -241,11 +245,13 @@ def _is_common_or_challenge_issue(issue: dict, issue_meta_map: dict[int, dict], 
     meta = issue_meta_map.get(issue_number, {})
     if is_common_issue(meta):
         return True
-    if is_challenge_issue(meta):
-        return True
+    return _is_challenge_issue_number(issue_number, meta, challenge_issue_numbers)
+
+
+def _is_challenge_issue_number(issue_number: int | None, meta: dict, challenge_issue_numbers: set[int]) -> bool:
     if issue_number in challenge_issue_numbers:
         return True
-    return False
+    return is_challenge_issue(meta)
 
 
 def _is_high_difficulty_file(file_path: str) -> bool:

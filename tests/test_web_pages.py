@@ -346,3 +346,50 @@ def test_closed_issue_is_shown_as_done_in_issue_board(app):
 
     assert 500 in done_issue_numbers
     assert 500 not in in_progress_issue_numbers
+
+
+def test_closed_challenge_issue_is_shown_as_done_not_challenge(app, monkeypatch):
+    with app.app_context():
+        user_id = upsert_user("5007", "closed-challenge-user", "closed challenge user")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="780",
+            default_branch="main",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="523",
+            issue_number=23,
+            title="[WEEK2] 문자열 - IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+
+        monkeypatch.setattr(
+            "app.services.web_app_service.build_template_status",
+            lambda repository_id: {
+                "active_week": "week2",
+                "all_matched_issues": [
+                    {
+                        "issue_number": 23,
+                        "week_label": "week2",
+                        "category": "weekly",
+                        "track_type": "problem-solving",
+                        "difficulty_level": "high",
+                        "requirement_level": "optional",
+                    }
+                ],
+            },
+        )
+
+        board = build_issue_board({"id": repository_id, "full_name": "JYPark-Code/SW-AI-W02-05"})
+
+    done_issue_numbers = {item["issue_number"] for item in board["columns"]["done"]}
+    challenge_issue_numbers = {item["issue_number"] for item in board["columns"]["challenge"]}
+
+    assert 23 in done_issue_numbers
+    assert 23 not in challenge_issue_numbers

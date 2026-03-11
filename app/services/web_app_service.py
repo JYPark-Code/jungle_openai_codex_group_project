@@ -102,14 +102,13 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
         if is_common_issue(issue_meta):
             continue
 
-        if issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta):
+        status_key = best_status_by_issue.get(issue["issue_number"])
+        if issue["state"] == "closed" or status_key == "solved":
+            status_key = "solved"
+        elif issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta):
             status_key = "challenge"
-        else:
-            status_key = best_status_by_issue.get(issue["issue_number"])
-            if issue["state"] == "closed":
-                status_key = "solved"
-            if not status_key:
-                status_key = "not_started"
+        elif not status_key:
+            status_key = "not_started"
 
         current_week_issues.append(
             {

@@ -290,6 +290,71 @@ def test_report_treats_high_difficulty_filename_as_challenge(app, monkeypatch):
     assert report["attempted_count"] == 0
 
 
+def test_report_counts_closed_challenge_issue_as_solved(app, monkeypatch):
+    repository_id, commit_id = ensure_ops_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="523",
+            issue_number=23,
+            title="[WEEK2] 문자열 - IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=23,
+            problem_key="[WEEK2] 문자열 - IPv6",
+            file_path="week2/string_ipv6.py",
+            judgement_status="solved",
+            match_score=1.0,
+            matched_by_filename=True,
+        )
+
+    monkeypatch.setattr(
+        "app.services.report_service.build_template_status",
+        lambda repository_id: {
+            "active_week": "week2",
+            "template_count": 1,
+            "matched_count": 1,
+            "missing_count": 0,
+            "required_template_count": 0,
+            "required_matched_count": 0,
+            "required_progress": 0.0,
+            "matched_issues": [],
+            "missing_issues": [],
+            "all_matched_issues": [
+                {
+                    "issue_number": 23,
+                    "week_label": "week2",
+                    "category": "weekly",
+                    "track_type": "problem-solving",
+                    "difficulty_level": "high",
+                    "requirement_level": "optional",
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.get_recommendations",
+        lambda repository_id: {"weak_topics": [], "recommendations": []},
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.rank_weak_topics",
+        lambda repository_id, limit=5: [],
+    )
+
+    with app.app_context():
+        report = build_user_report(repository_id)
+
+    assert report["challenge_count"] == 0
+    assert report["solved_count"] == 1
+    assert report["attempted_count"] == 0
+
+
 def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
     templates = load_issue_templates(Path("resources/csv"))
     week2_required = [

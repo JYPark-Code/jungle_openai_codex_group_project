@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero">
+    <p class="eyebrow">깃허브 알고리즘 스터디 도우미</p>
+    <h1>알고리즘 연습 문제를 만들고 GitHub 이슈로 바로 등록해보세요.</h1>
+    <p class="subtitle">
+      학습할 알고리즘 주제를 입력하면 연습 문제를 만들고, 각 GitHub 이슈 생성 결과까지 한눈에 확인할 수 있습니다.
+    </p>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>문제 생성</h2>
+      <form method="post">
+        <input type="hidden" name="action" value="generate">
+        <label for="topic">알고리즘 주제</label>
+        <input
+          id="topic"
+          name="topic"
+          type="text"
+          value="{{ topic }}"
+          placeholder="recursion, backtracking, graph, dp"
+          required
+        >
+        <button type="submit">문제 만들고 이슈 생성하기</button>
+      </form>
+      <form method="post">
+        <input type="hidden" name="action" value="analyze">
+        <button type="submit">저장소 풀이 분석하기</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>현재 연결된 저장소</h2>
+      <p><strong>{{ repo_target }}</strong></p>
+      <p>
+        GitHub 토큰:
+        <strong>
+          {% if github_token_set %}
+            설정됨
+          {% else %}
+            설정되지 않음
+          {% endif %}
+        </strong>
+      </p>
+      <p>
+        <code>.env</code>에 <code>REPO_OWNER</code>와 <code>REPO_NAME</code>을 설정해주세요.
+        또는 <code>REPO_NAME=owner/repo</code> 형식도 사용할 수 있습니다.
+      </p>
+    </div>
+  </section>
+
+  {% if results %}
+    <section class="card-list">
+      {% for item in results %}
+        <article class="problem-card">
+          <span class="badge">
+            {% if item.status == "생성 완료" %}
+              이슈 생성 완료
+            {% else %}
+              생성 대기 또는 실패
+            {% endif %}
+          </span>
+          <h3>{{ item.title }}</h3>
+          <p>{{ item.body }}</p>
+          <p><strong>생성 결과:</strong> {{ item.status }}</p>
+          <p>
+            <strong>이슈 번호:</strong>
+            {% if item.issue_number %}
+              #{{ item.issue_number }}
+            {% else %}
+              -
+            {% endif %}
+          </p>
+          <p>
+            <strong>이슈 링크:</strong>
+            {% if item.issue_url %}
+              <a href="{{ item.issue_url }}" target="_blank" rel="noreferrer">{{ item.issue_url }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </p>
+          {% if item.error %}
+            <p><strong>안내:</strong> {{ item.error }}</p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <div class="empty">
+      아직 생성된 문제가 없습니다. 주제를 입력하면 발표용 연습 문제와 GitHub 이슈 생성 결과를 확인할 수 있습니다.
+    </div>
+  {% endif %}
+
+  {% if analysis %}
+    <section class="stack">
+      <div class="panel">
+        <h2 class="section-title">저장소 분석 결과</h2>
+        <p><strong>분석한 파일 수:</strong> {{ analysis.analyzed_files_count }}</p>
+        <p>
+          <strong>감지된 주제:</strong>
+          {% if analysis.detected_topics %}
+            {% for topic_name in analysis.detected_topics %}
+              {{ topic_labels.get(topic_name, topic_name) }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            감지된 주제가 없습니다
+          {% endif %}
+        </p>
+        <p>
+          <strong>보완이 필요한 주제:</strong>
+          {% if analysis.weak_or_missing_topics %}
+            {% for topic_name in analysis.weak_or_missing_topics %}
+              {{ topic_labels.get(topic_name, topic_name) }}{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            큰 공백은 보이지 않습니다
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">분석 코멘트</h2>
+        <ul class="plain-list">
+          {% for comment in analysis.simple_review_comments %}
+            <li>{{ comment }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">다음 추천 주제</h2>
+        {% if analysis.recommended_next_topics %}
+          <ul class="plain-list">
+            {% for topic_name in analysis.recommended_next_topics %}
+              <li>{{ topic_labels.get(topic_name, topic_name) }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>지금은 추가 추천 주제가 없습니다.</p>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <h2 class="section-title">추천 연습 문제</h2>
+        {% if analysis.recommended_practice_problems %}
+          <section class="card-list">
+            {% for item in analysis.recommended_practice_problems %}
+              <article class="problem-card">
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.body }}</p>
+              </article>
+            {% endfor %}
+          </section>
+        {% else %}
+          <p>추천할 연습 문제가 아직 없습니다.</p>
+        {% endif %}
+      </div>
+    </section>
+  {% endif %}
+{% endblock %}

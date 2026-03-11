@@ -35,7 +35,7 @@ def login_page():
         "web_login.html",
         oauth_configured=_web_oauth_is_configured(),
         error_message=request.args.get("error", "").strip(),
-        demo_mode=True,
+        demo_mode=False,
     )
 
 

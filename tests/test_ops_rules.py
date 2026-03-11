@@ -296,5 +296,8 @@ def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
         item for item in templates
         if item["week_label"] == "week2" and item["requirement_level"] == "required"
     ]
+    required_titles = {item["title"] for item in week2_required}
 
     assert len(week2_required) == 20
+    assert "백트래킹 - 외판원 순회 2" in required_titles
+    assert "백트래킹 - N-Queen" in required_titles

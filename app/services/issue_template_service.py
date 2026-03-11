@@ -105,10 +105,7 @@ def build_template_status(
         for item in active_matched
         if is_required_coding_issue(item)
     }
-    challenge_active_issues = [
-        item for item in (active_matched + active_missing)
-        if is_challenge_issue(item)
-    ]
+    challenge_active_issues = [item for item in (active_matched + active_missing) if is_challenge_issue(item)]
 
     required_progress = (
         len(matched_required_titles) / len(required_active_templates)
@@ -214,8 +211,8 @@ KNOWN_CHALLENGE_NORMALIZED_TITLES = {normalize_title(title) for title in KNOWN_C
 KNOWN_DIFFICULTY_OVERRIDES = {
     normalize_title("문자열 - 광고"): "high",
     normalize_title("정수론 - 제곱 ㄴㄴ 수"): "high",
-    normalize_title("백트래킹 - 외판원 순회 2"): "high",
-    normalize_title("백트래킹 - N-Queen"): "high",
+    normalize_title("문자열 - IPv6"): "high",
+    normalize_title("재귀함수 - 하노이 탑"): "high",
     normalize_title("백트래킹 - 비숍"): "high",
 }
 
@@ -269,11 +266,11 @@ def infer_difficulty_level(title: str, content: str) -> str:
     normalized_title = normalize_title(title)
     if normalized_title in KNOWN_DIFFICULTY_OVERRIDES:
         return KNOWN_DIFFICULTY_OVERRIDES[normalized_title]
-    if "난이도하" in lowered or re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
+    if "최하" in lowered or re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
         return "low"
-    if "난이도중" in lowered or re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):
+    if "중" in lowered or re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):
         return "medium"
-    if "난이도상" in lowered or re.search(r"(^|[\s\-_[(])상($|[\s\-_)\]])", lowered):
+    if "최상" in lowered or re.search(r"(^|[\s\-_[(])상($|[\s\-_)\]])", lowered):
         return "high"
     return "unspecified"
 

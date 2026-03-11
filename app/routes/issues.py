@@ -1,4 +1,4 @@
-from flask import Blueprint, session
+from flask import Blueprint, request, session
 
 from app.routes.repositories import _require_current_repository
 from app.services.issue_template_service import build_template_status, create_missing_issues
@@ -13,7 +13,8 @@ issues_bp = Blueprint("issues", __name__)
 def issue_template_status():
     require_authenticated_user()
     repository = _require_current_repository()
-    status = build_template_status(repository["id"])
+    active_week = (request.args.get("week") or "").strip().casefold() or None
+    status = build_template_status(repository["id"], active_week=active_week)
 
     return success_response(
         data=status,
@@ -26,8 +27,10 @@ def create_template_missing_issues():
     require_authenticated_user()
     repository = _require_current_repository()
     access_token = session.get("oauth_access_token", "")
+    payload = request.get_json(silent=True) or {}
+    active_week = str(payload.get("week", "")).strip().casefold() or None
 
-    result = create_missing_issues(repository, access_token)
+    result = create_missing_issues(repository, access_token, active_week=active_week)
     return success_response(
         data=result,
         message="누락 이슈 생성을 완료했습니다.",

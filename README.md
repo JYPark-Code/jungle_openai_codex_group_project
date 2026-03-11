@@ -1,21 +1,35 @@
 # 정글 알고리즘 학습 운영 대시보드 API
 
-정글 알고리즘 학습 운영 대시보드의 백엔드 API 프로젝트입니다.  
-GitHub 저장소를 기준으로 주차별 과제 진행도, 이슈 누락 여부, commit 기반 풀이 분석, 풀이 판정, 알고리즘 Skill Map, 약점 기반 추천, 대시보드/마이페이지 리포트를 제공합니다.
+정글 알고리즘 학습 운영 대시보드의 백엔드 API 프로젝트입니다.
 
-## 핵심 기능
+GitHub 저장소를 기준으로 아래 흐름을 지원합니다.
 
 - GitHub OAuth 로그인
-- 분석 대상 GitHub 저장소 선택
-- GitHub issues / commits 동기화
-- CSV 템플릿 기반 주차별 과제 issue 매칭 및 누락 issue 생성
-- commit 기반 파일 분석 및 풀이 판정
-- 알고리즘 taxonomy 기반 Skill Map 분석
-- 약점 유형 기반 외부 문제 추천
-- 대시보드 요약 API
-- 마이페이지 분석 리포트 API
+- 분석 대상 저장소 선택
+- Issues / Commits 동기화
+- CSV 템플릿 기준 주차별 과제 관리
+- Commit 기반 풀이 분석 및 판정
+- 알고리즘 Skill Map 생성
+- 약점 기반 추천 문제 제공
+- 대시보드 / 마이페이지 리포트 제공
 
-## 현재 기술 스택
+## 운영 규칙 반영 범위
+
+현재 백엔드는 정글 운영 규칙 1차를 반영하고 있습니다.
+
+- `basic`, `common` 항목은 필수 과제로 처리
+- `problem-solving`은 기본적으로 필수로 처리
+- `problem-solving 상`, `Extra`는 선택 과제로 처리
+- 주차 진행률은 전체 CSV가 아니라 `현재 active week의 필수 과제` 기준으로 계산
+- 이슈와 매칭되지 않은 임의 연습 commit은 `extra_practice_count`로 별도 집계
+- 현재 주차 GitHub Project 추적 메타데이터 저장 지원
+
+아직 미구현된 범위:
+
+- GitHub Project 실제 생성 자동화
+- 백준 예제 입력/출력 기반 solved 최종 판정
+
+## 기술 스택
 
 - Backend: Flask
 - Database: SQLite
@@ -54,10 +68,7 @@ python run.py
 
 ## 환경변수
 
-실행 전 `.env` 파일을 준비해야 합니다.  
-`.env.example`은 필요한 환경변수 이름을 공유하기 위한 예시 파일로 유지하는 것을 권장합니다.
-
-예시:
+`.env.example`을 참고해서 `.env`를 구성하면 됩니다.
 
 ```env
 SECRET_KEY=your_secret_key
@@ -68,21 +79,21 @@ GITHUB_OAUTH_SCOPE=read:user
 GITHUB_TOKEN=optional_github_token
 REPO_OWNER=JYPark-Code
 REPO_NAME=SW-AI-W02-05
+ACTIVE_WEEK=week3
 ```
 
-설명:
+주요 값 설명:
 
 - `SECRET_KEY`: Flask session 서명용
 - `GITHUB_CLIENT_ID`: GitHub OAuth 앱 Client ID
 - `GITHUB_CLIENT_SECRET`: GitHub OAuth 앱 Client Secret
 - `GITHUB_REDIRECT_URI`: GitHub OAuth callback URL
 - `GITHUB_OAUTH_SCOPE`: 기본 OAuth scope
-- `GITHUB_TOKEN`: 일부 개발/운영용 GitHub API 호출용
+- `GITHUB_TOKEN`: 일부 운영/관리성 GitHub API 호출용
 - `REPO_OWNER`, `REPO_NAME`: 기본 저장소 설정값
+- `ACTIVE_WEEK`: 현재 운영 기준 주차. 예: `week2`, `week3`
 
-## API 개요
-
-주요 API 범위:
+## 주요 API 범위
 
 - 인증
   - `/api/auth/github/login`
@@ -104,15 +115,17 @@ REPO_NAME=SW-AI-W02-05
   - `/api/commits/{sha}/judge`
   - `/api/commits/{sha}/judge-result`
   - `/api/commits/{sha}/review`
-  - `/api/commits/{sha}/review`
 - Skill Map / 추천 / 리포트
   - `/api/repositories/current/skill-map`
   - `/api/repositories/current/recommendations/generate`
   - `/api/repositories/current/recommendations`
   - `/api/dashboard/summary`
   - `/api/mypage/report`
+- 운영용 Project 추적
+  - `/api/repositories/current/projects/track`
+  - `/api/repositories/current/projects/current`
 
-상세 스펙은 [API_REFERENCE.md](C:\jungle\openai\mini-hackathon-web\API_REFERENCE.md) 문서를 참고하면 됩니다.
+상세 명세는 [API_REFERENCE.md](C:\jungle\openai\mini-hackathon-web\API_REFERENCE.md)를 참고하면 됩니다.
 
 ## 테스트 실행
 
@@ -120,27 +133,25 @@ REPO_NAME=SW-AI-W02-05
 python -m pytest -q
 ```
 
-현재 프로젝트에는 아래 테스트가 포함되어 있습니다.
+현재 포함된 테스트:
 
 - OAuth 로그인 테스트
 - 저장소 선택/조회 테스트
 - GitHub 동기화 테스트
-- CSV 이슈 템플릿 테스트
-- commit 판정 테스트
+- CSV 템플릿 이슈 테스트
+- Commit 판정 테스트
 - Skill Map / 코드 리뷰 테스트
 - 추천 로직 테스트
-- 대시보드 / 마이페이지 리포트 테스트
+- 리포트 테스트
+- 운영 규칙 반영 테스트
 
-## 발표 관점 요약
-
-이 프로젝트는 단순 문제 생성기가 아니라, GitHub 저장소를 학습 운영 데이터의 원본으로 사용해 학습 상태를 한 곳에서 보여주는 운영 대시보드입니다.
-
-주요 데모 흐름:
+## 데모 흐름 예시
 
 1. GitHub OAuth 로그인
 2. 분석할 저장소 선택
-3. issues / commits 동기화
-4. CSV 템플릿 기준 과제 누락 확인
-5. commit 분석 및 풀이 판정
-6. Skill Map과 약점 분석 확인
-7. 추천 문제 및 마이페이지 리포트 확인
+3. Issues / Commits 동기화
+4. `ACTIVE_WEEK` 기준 주차 진행률 확인
+5. 누락 필수 이슈 생성
+6. Commit 분석 및 풀이 판정
+7. Skill Map과 약점 영역 확인
+8. 추천 문제 및 마이페이지 리포트 확인

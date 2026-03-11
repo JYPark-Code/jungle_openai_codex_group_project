@@ -130,6 +130,19 @@ CREATE TABLE IF NOT EXISTS recommendation_history (
     FOREIGN KEY (repository_id) REFERENCES repositories (id),
     FOREIGN KEY (report_id) REFERENCES analysis_reports (id)
 );
+
+CREATE TABLE IF NOT EXISTS github_projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repository_id INTEGER NOT NULL,
+    week_label TEXT NOT NULL,
+    project_title TEXT NOT NULL,
+    project_url TEXT,
+    project_number TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (repository_id) REFERENCES repositories (id)
+);
 """
 
 
@@ -969,3 +982,84 @@ def get_latest_analysis_report(repository_id: int, report_scope: str) -> dict | 
         "topic_breakdown": json.loads(row["topic_breakdown_json"] or "{}"),
         "weak_topics": json.loads(row["weak_topics_json"] or "[]"),
     }
+
+
+def save_github_project_tracking(
+    repository_id: int,
+    week_label: str,
+    project_title: str,
+    project_url: str = "",
+    project_number: str = "",
+    is_active: bool = True,
+) -> int:
+    connection = get_db()
+    timestamp = now_iso()
+    if is_active:
+        connection.execute(
+            "UPDATE github_projects SET is_active = 0, updated_at = ? WHERE repository_id = ?",
+            (timestamp, repository_id),
+        )
+
+    existing = connection.execute(
+        """
+        SELECT id FROM github_projects
+        WHERE repository_id = ? AND week_label = ? AND project_title = ?
+        """,
+        (repository_id, week_label, project_title),
+    ).fetchone()
+
+    if existing:
+        connection.execute(
+            """
+            UPDATE github_projects
+            SET project_url = ?, project_number = ?, is_active = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (project_url, project_number, int(is_active), timestamp, existing["id"]),
+        )
+        connection.commit()
+        return existing["id"]
+
+    cursor = connection.execute(
+        """
+        INSERT INTO github_projects (
+            repository_id, week_label, project_title, project_url, project_number,
+            is_active, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            repository_id,
+            week_label,
+            project_title,
+            project_url,
+            project_number,
+            int(is_active),
+            timestamp,
+            timestamp,
+        ),
+    )
+    connection.commit()
+    return cursor.lastrowid
+
+
+def get_active_github_project(repository_id: int) -> dict | None:
+    return get_db().execute(
+        """
+        SELECT
+            id,
+            repository_id,
+            week_label,
+            project_title,
+            project_url,
+            project_number,
+            is_active,
+            created_at,
+            updated_at
+        FROM github_projects
+        WHERE repository_id = ? AND is_active = 1
+        ORDER BY updated_at DESC, id DESC
+        LIMIT 1
+        """,
+        (repository_id,),
+    ).fetchone()

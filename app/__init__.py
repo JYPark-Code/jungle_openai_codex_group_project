@@ -10,6 +10,7 @@ from app.routes.auth import auth_bp
 from app.routes.api import api_bp
 from app.routes.dashboard import dashboard_bp
 from app.routes.issues import issues_bp
+from app.routes.projects import projects_bp
 from app.routes.recommendations import recommendations_bp
 from app.routes.repositories import repositories_bp
 from app.utils.errors import register_error_handlers
@@ -37,6 +38,7 @@ def create_app(config_object=None, config_overrides=None):
     app.register_blueprint(commits_bp)
     app.register_blueprint(repositories_bp)
     app.register_blueprint(issues_bp)
+    app.register_blueprint(projects_bp)
     app.register_blueprint(recommendations_bp)
 
     return app

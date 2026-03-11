@@ -13,6 +13,7 @@ class Config:
     GITHUB_OAUTH_SCOPE = os.getenv("GITHUB_OAUTH_SCOPE", "read:user")
     REPO_OWNER = os.getenv("REPO_OWNER", "")
     REPO_NAME = os.getenv("REPO_NAME", "")
+    ACTIVE_WEEK = os.getenv("ACTIVE_WEEK", "")
     DATABASE = None
 
 
@@ -26,3 +27,4 @@ class TestingConfig(Config):
     GITHUB_REDIRECT_URI = "http://localhost/test/callback"
     REPO_OWNER = "test-owner"
     REPO_NAME = "test-repo"
+    ACTIVE_WEEK = "week2"

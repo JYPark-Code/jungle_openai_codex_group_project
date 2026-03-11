@@ -77,3 +77,71 @@ def summarize_judgement_statuses(judgements: list[dict]) -> dict:
         elif status == "solved":
             summary["solved_count"] += 1
     return summary
+
+
+def normalize_project_status(status: str | None) -> str:
+    normalized = (status or "").strip().casefold().replace("_", " ").replace("-", " ")
+    normalized = " ".join(normalized.split())
+    if normalized == "done":
+        return "done"
+    if normalized in {"in progress", "inprogress"}:
+        return "in_progress"
+    if normalized in {"to do", "todo"}:
+        return "todo"
+    return ""
+
+
+def resolve_tracked_issue_status(issue: dict, judgement_status: str | None) -> str | None:
+    project_status = normalize_project_status(issue.get("project_status"))
+    if project_status == "done":
+        return "solved"
+    if project_status == "in_progress":
+        return "attempted"
+    if project_status == "todo":
+        return None
+    if issue.get("state") == "closed":
+        return "solved"
+    return judgement_status
+
+
+def build_reporting_issue_entries(
+    issues: list[dict],
+    judgements: list[dict],
+    issue_matcher: Callable[[str, list[dict]], dict],
+) -> tuple[list[dict], list[dict]]:
+    collapsed, extras = collapse_judgements_for_reporting(judgements, issues, issue_matcher)
+    judgement_by_issue = {item.get("issue_number"): item for item in collapsed if item.get("issue_number") is not None}
+    tracked = []
+    seen_issue_numbers = set()
+
+    for issue in issues:
+        matched = judgement_by_issue.get(issue.get("issue_number"), {})
+        seen_issue_numbers.add(issue.get("issue_number"))
+        tracked.append(
+            {
+                "issue_number": issue.get("issue_number"),
+                "title": issue.get("title", ""),
+                "state": issue.get("state", ""),
+                "project_status": issue.get("project_status", ""),
+                "problem_key": matched.get("problem_key") or issue.get("title", ""),
+                "file_path": matched.get("file_path", ""),
+                "judgement_status": resolve_tracked_issue_status(issue, matched.get("judgement_status")),
+            }
+        )
+
+    for issue_number, matched in judgement_by_issue.items():
+        if issue_number in seen_issue_numbers:
+            continue
+        tracked.append(
+            {
+                "issue_number": issue_number,
+                "title": matched.get("problem_key", ""),
+                "state": "",
+                "project_status": "",
+                "problem_key": matched.get("problem_key", ""),
+                "file_path": matched.get("file_path", ""),
+                "judgement_status": matched.get("judgement_status"),
+            }
+        )
+
+    return tracked, extras

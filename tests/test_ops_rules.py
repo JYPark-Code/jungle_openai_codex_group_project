@@ -410,6 +410,52 @@ def test_report_counts_closed_issue_from_orphan_judgement_as_solved(app, monkeyp
     assert report["extra_practice_count"] == 0
 
 
+def test_report_uses_project_done_as_solved_source_of_truth(app, monkeypatch):
+    repository_id, _commit_id = ensure_ops_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="project-done-1",
+            issue_number=11,
+            title="[WEEK2] 문자열 - 광고",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="Done",
+        )
+
+    monkeypatch.setattr(
+        "app.services.report_service.build_template_status",
+        lambda repository_id: {
+            "active_week": "week2",
+            "template_count": 1,
+            "matched_count": 1,
+            "missing_count": 0,
+            "required_template_count": 1,
+            "required_matched_count": 1,
+            "required_progress": 1.0,
+            "matched_issues": [],
+            "missing_issues": [],
+            "all_matched_issues": [],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.get_recommendations",
+        lambda repository_id: {"weak_topics": [], "recommendations": []},
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.rank_weak_topics",
+        lambda repository_id, limit=5: [],
+    )
+
+    with app.app_context():
+        report = build_user_report(repository_id)
+
+    assert report["solved_count"] == 1
+    assert report["attempted_count"] == 0
+
+
 def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
     templates = load_issue_templates(Path("resources/csv"))
     week2_required = [

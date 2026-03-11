@@ -6,7 +6,10 @@ from app.models.db import (
     list_problem_judgements_by_repository_id,
 )
 from app.services.commit_judge_service import match_issue_by_filename
-from app.services.reporting_judgement_service import collapse_judgements_for_reporting, summarize_judgement_statuses
+from app.services.reporting_judgement_service import (
+    build_reporting_issue_entries,
+    summarize_judgement_statuses,
+)
 
 
 ALGORITHM_TAXONOMY = {
@@ -185,17 +188,22 @@ def match_categories_from_text(*texts: str) -> list[str]:
 
 def build_skill_map(repository_id: int) -> dict:
     issues = get_issues_by_repository_id(repository_id)
-    collapsed, extras = collapse_judgements_for_reporting(
-        list_problem_judgements_by_repository_id(repository_id),
+    tracked_entries, extras = build_reporting_issue_entries(
         issues,
+        list_problem_judgements_by_repository_id(repository_id),
         match_issue_by_filename,
     )
     reverse_mapping = build_reverse_taxonomy()
-    domain_stats = defaultdict(lambda: {"name": "", "total": 0, "solved": 0, "possibly_solved": 0, "attempted": 0})
+    domain_stats = defaultdict(
+        lambda: {"name": "", "total": 0, "solved": 0, "possibly_solved": 0, "attempted": 0, "not_started": 0}
+    )
 
-    normalized_judgements = collapsed + extras
+    normalized_judgements = tracked_entries + extras
     for judgement in normalized_judgements:
-        categories = match_categories_from_text(judgement["problem_key"], judgement.get("file_path", ""))
+        categories = match_categories_from_text(
+            judgement.get("problem_key") or judgement.get("title", ""),
+            judgement.get("file_path", ""),
+        )
         domains = {reverse_mapping[category] for category in categories if category in reverse_mapping}
         for domain in domains:
             domain_stats[domain]["name"] = domain
@@ -205,8 +213,10 @@ def build_skill_map(repository_id: int) -> dict:
                 domain_stats[domain]["solved"] += 1
             elif status == "possibly_solved":
                 domain_stats[domain]["possibly_solved"] += 1
-            else:
+            elif status == "attempted":
                 domain_stats[domain]["attempted"] += 1
+            else:
+                domain_stats[domain]["not_started"] += 1
 
     summary = summarize_judgement_statuses(normalized_judgements)
     domains = sorted(domain_stats.values(), key=lambda item: item["name"])

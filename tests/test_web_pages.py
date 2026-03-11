@@ -439,3 +439,56 @@ def test_orphan_closed_issue_is_shown_as_done_in_issue_board(app):
 
     assert 23 in done_issue_numbers
     assert 23 not in in_progress_issue_numbers
+
+
+def test_project_status_controls_issue_board_columns(app):
+    with app.app_context():
+        user_id = upsert_user("5009", "project-status-user", "project status user")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="782",
+            default_branch="main",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="todo-1",
+            issue_number=1,
+            title="[WEEK2] 구현 - A",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="To-do",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="progress-2",
+            issue_number=2,
+            title="[WEEK2] 구현 - B",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="In Progress",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="done-3",
+            issue_number=3,
+            title="[WEEK2] 구현 - C",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="Done",
+        )
+
+        board = build_issue_board({"id": repository_id, "full_name": "JYPark-Code/SW-AI-W02-05"})
+
+    todo_issue_numbers = {item["issue_number"] for item in board["columns"]["todo"]}
+    in_progress_issue_numbers = {item["issue_number"] for item in board["columns"]["in_progress"]}
+    done_issue_numbers = {item["issue_number"] for item in board["columns"]["done"]}
+
+    assert 1 in todo_issue_numbers
+    assert 2 in in_progress_issue_numbers
+    assert 3 in done_issue_numbers

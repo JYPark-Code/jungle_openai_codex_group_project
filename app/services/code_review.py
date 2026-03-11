@@ -13,6 +13,7 @@ from app.models.db import (
 )
 from app.services.commit_judge_service import match_issue_by_filename
 from app.services.github_service import fetch_commit_changed_files, fetch_file_content_at_ref
+from app.services.reporting_judgement_service import resolve_tracked_issue_status
 from app.services.skill_map_service import match_categories_from_text
 from app.utils.errors import ApiError
 
@@ -323,10 +324,14 @@ def _resolve_issue_context(file_path: str, issues: list[dict], judgement_map: di
         matched_issue = matched.get("issue")
         match_score = matched.get("score", 0.0)
 
+    judgement_status = judgement.get("judgement_status")
+    if matched_issue is not None:
+        judgement_status = resolve_tracked_issue_status(matched_issue, judgement_status)
+
     return {
         "issue_number": issue_number if issue_number is not None else (matched_issue or {}).get("issue_number"),
         "issue_title": judgement.get("problem_key") or (matched_issue or {}).get("title"),
-        "judgement_status": judgement.get("judgement_status"),
+        "judgement_status": judgement_status,
         "match_score": match_score,
     }
 

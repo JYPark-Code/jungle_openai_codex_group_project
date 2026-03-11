@@ -1,11 +1,17 @@
 from app.models.db import (
+    get_active_github_project,
     get_sync_status,
     record_issue_sync_result,
     save_commit,
     save_issue,
     update_repository_last_synced_at,
 )
-from app.services.github_service import fetch_repository_commits, fetch_repository_issues
+from app.services.github_service import (
+    fetch_project_item_statuses,
+    fetch_repository_commits,
+    fetch_repository_issues,
+    parse_project_owner,
+)
 
 
 def sync_repository_issues_and_commits(repository: dict, access_token: str) -> dict:
@@ -15,6 +21,17 @@ def sync_repository_issues_and_commits(repository: dict, access_token: str) -> d
 
     issues = fetch_repository_issues(owner, name, access_token)
     commits = fetch_repository_commits(owner, name, access_token)
+    active_project = get_active_github_project(repository_id)
+    project_statuses = {}
+    if active_project and active_project.get("project_number"):
+        project_owner = parse_project_owner(active_project.get("project_url", ""), fallback_owner=owner)
+        project_statuses = fetch_project_item_statuses(
+            project_owner=project_owner,
+            project_number=active_project["project_number"],
+            repo_owner=owner,
+            repo_name=name,
+            access_token=access_token,
+        )
 
     new_issue_count = 0
     for issue in issues:
@@ -26,6 +43,7 @@ def sync_repository_issues_and_commits(repository: dict, access_token: str) -> d
             body=issue["body"],
             state=issue["state"],
             github_created_at=issue["created_at"],
+            project_status=project_statuses.get(issue.get("issue_number"), issue.get("project_status", "")),
         )
         if created:
             new_issue_count += 1

@@ -19,7 +19,10 @@ from app.services.commit_judge_service import (
 from app.services.github_service import fetch_commit_changed_files, fetch_file_content_at_ref
 from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue
 from app.services.recommendation_service import generate_recommendations
-from app.services.reporting_judgement_service import collapse_judgements_for_reporting
+from app.services.reporting_judgement_service import (
+    build_reporting_issue_entries,
+    normalize_project_status,
+)
 from app.services.report_service import build_user_report
 from app.utils.errors import ApiError
 
@@ -95,15 +98,16 @@ def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc"
 
 def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dict:
     issues = get_issues_by_repository_id(repository["id"])
-    collapsed, _extras = collapse_judgements_for_reporting(
-        list_problem_judgements_by_repository_id(repository["id"]),
+    tracked_entries, _extras = build_reporting_issue_entries(
         issues,
+        list_problem_judgements_by_repository_id(repository["id"]),
         match_issue_by_filename,
     )
     template_status = build_template_status(repository["id"])
     issue_meta_map = _build_issue_meta_map(template_status)
-    challenge_issue_numbers = _build_challenge_issue_numbers(collapsed)
-    best_status_by_issue = _build_issue_status_map(collapsed)
+    challenge_issue_numbers = _build_challenge_issue_numbers(tracked_entries)
+    best_status_by_issue = _build_issue_status_map(tracked_entries)
+    issue_lookup = {item["issue_number"]: item for item in tracked_entries}
 
     current_week_key = template_status.get("active_week") or _pick_current_week_key(issues)
     current_week_issues = []
@@ -117,9 +121,15 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
         if is_common_issue(issue_meta):
             continue
 
+        tracked_issue = issue_lookup.get(issue["issue_number"], {})
+        project_status = normalize_project_status(tracked_issue.get("project_status"))
         status_key = best_status_by_issue.get(issue["issue_number"])
-        if issue["state"] == "closed" or status_key == "solved":
+        if project_status == "done" or issue["state"] == "closed" or status_key == "solved":
             status_key = "solved"
+        elif project_status == "in_progress":
+            status_key = "attempted"
+        elif project_status == "todo":
+            status_key = "not_started"
         elif issue["issue_number"] in challenge_issue_numbers or is_challenge_issue(issue_meta):
             status_key = "challenge"
         elif not status_key:

@@ -8,7 +8,7 @@ from app.models.db import (
     save_recommendation,
 )
 from app.services.commit_judge_service import match_issue_by_filename
-from app.services.reporting_judgement_service import collapse_judgements_for_reporting
+from app.services.reporting_judgement_service import build_reporting_issue_entries
 from app.services.skill_map_service import CATEGORY_KEYWORDS, match_categories_from_text
 
 
@@ -229,12 +229,12 @@ def calculate_weak_topics(repository_id: int, limit: int = 3) -> list[str]:
 
 def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
     issues = get_issues_by_repository_id(repository_id)
-    collapsed, extras = collapse_judgements_for_reporting(
-        list_problem_judgements_by_repository_id(repository_id),
+    tracked_entries, extras = build_reporting_issue_entries(
         issues,
+        list_problem_judgements_by_repository_id(repository_id),
         match_issue_by_filename,
     )
-    judgements = collapsed + extras
+    judgements = tracked_entries + extras
     recent_topics = Counter(list_recent_commit_topics_by_repository_id(repository_id))
     category_stats = {
         category: {"total": 0, "solved": 0, "attempted_like": 0}
@@ -242,13 +242,16 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
     }
 
     for judgement in judgements:
-        categories = match_categories_from_text(judgement["problem_key"], judgement.get("file_path", ""))
+        categories = match_categories_from_text(
+            judgement.get("problem_key") or judgement.get("title", ""),
+            judgement.get("file_path", ""),
+        )
         for category in categories:
             stats = category_stats[category]
             stats["total"] += 1
             if judgement["judgement_status"] == "solved":
                 stats["solved"] += 1
-            else:
+            elif judgement["judgement_status"] in {"attempted", "possibly_solved"}:
                 stats["attempted_like"] += 1
 
     scored_topics = []

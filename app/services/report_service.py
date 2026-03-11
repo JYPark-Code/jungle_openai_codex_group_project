@@ -12,7 +12,7 @@ from app.models.db import (
 from app.services.commit_judge_service import match_issue_by_filename
 from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue
 from app.services.recommendation_service import get_recommendations, rank_weak_topics
-from app.services.reporting_judgement_service import collapse_judgements_for_reporting
+from app.services.reporting_judgement_service import build_reporting_issue_entries
 from app.services.skill_map_service import build_skill_map
 
 
@@ -110,25 +110,15 @@ def get_cached_report(repository_id: int, report_scope: str) -> dict | None:
 
 def build_tracked_problem_summary(repository_id: int) -> dict:
     issues = get_issues_by_repository_id(repository_id)
-    collapsed, extras = collapse_judgements_for_reporting(
-        list_problem_judgements_by_repository_id(repository_id),
+    tracked_entries, extras = build_reporting_issue_entries(
         issues,
+        list_problem_judgements_by_repository_id(repository_id),
         match_issue_by_filename,
     )
     template_status = build_template_status(repository_id)
     issue_meta_map = _build_issue_meta_map(template_status)
-    challenge_issue_numbers = _build_challenge_issue_numbers(collapsed)
-
-    best_status_by_issue = {}
-    priority = {"not_started": 0, "attempted": 1, "possibly_solved": 2, "solved": 3}
-    for item in collapsed:
-        issue_number = item.get("issue_number")
-        if issue_number is None:
-            continue
-        status = item["judgement_status"]
-        current = best_status_by_issue.get(issue_number)
-        if current is None or priority.get(status, -1) > priority.get(current, -1):
-            best_status_by_issue[issue_number] = status
+    challenge_issue_numbers = _build_challenge_issue_numbers(tracked_entries)
+    best_status_by_issue = {item["issue_number"]: item.get("judgement_status") for item in tracked_entries}
 
     summary = {
         "solved_count": 0,
@@ -144,8 +134,6 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
         issue_number = issue["issue_number"]
         issue_meta = issue_meta_map.get(issue_number, {})
         status = best_status_by_issue.get(issue_number)
-        if issue["state"] == "closed":
-            status = "solved"
 
         if is_common_issue(issue_meta):
             continue

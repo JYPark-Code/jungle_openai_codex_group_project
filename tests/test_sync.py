@@ -167,3 +167,52 @@ def test_sync_service_uses_mocked_github_api(app, monkeypatch):
     assert result["new_commit_count"] == 0
     assert status["issue_count"] == 0
     assert status["commit_count"] == 0
+
+
+def test_repository_sync_saves_project_status_from_tracked_project(client, app, monkeypatch):
+    from app.models.db import get_issues_by_repository_id, save_github_project_tracking
+
+    repository_id = ensure_user_and_repository(app)
+    login_with_current_repository(client, repository_id)
+
+    with app.app_context():
+        save_github_project_tracking(
+            repository_id=repository_id,
+            week_label="week2",
+            project_title="Week 2 Tracking",
+            project_url="https://github.com/orgs/JYPark-Code/projects/3",
+            project_number="3",
+            is_active=True,
+        )
+
+    monkeypatch.setattr(
+        "app.services.sync_service.fetch_repository_issues",
+        lambda owner, name, access_token: [
+            {
+                "github_issue_id": "100",
+                "issue_number": 11,
+                "title": "week2 문제",
+                "body": "week2 content",
+                "state": "open",
+                "project_status": "",
+                "created_at": "2026-03-11T10:00:00Z",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "app.services.sync_service.fetch_repository_commits",
+        lambda owner, name, access_token: [],
+    )
+    monkeypatch.setattr(
+        "app.services.sync_service.fetch_project_item_statuses",
+        lambda project_owner, project_number, repo_owner, repo_name, access_token: {11: "Done"},
+    )
+
+    response = client.post("/api/repositories/current/sync")
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        issues = get_issues_by_repository_id(repository_id)
+
+    assert issues[0]["project_status"] == "Done"

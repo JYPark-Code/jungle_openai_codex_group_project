@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS issues (
     title TEXT NOT NULL,
     body TEXT,
     state TEXT NOT NULL,
+    project_status TEXT,
     github_created_at TEXT,
     created_at TEXT NOT NULL,
     UNIQUE(repository_id, github_issue_id),
@@ -398,6 +399,7 @@ def get_issues_by_repository_id(repository_id: int) -> list[dict]:
             title,
             body,
             state,
+            project_status,
             github_created_at,
             created_at
         FROM issues
@@ -423,6 +425,11 @@ def _ensure_legacy_columns(connection: sqlite3.Connection) -> None:
     judgement_column_names = {row["name"] for row in judgement_rows}
     if "match_score" not in judgement_column_names:
         connection.execute("ALTER TABLE problem_judgements ADD COLUMN match_score REAL NOT NULL DEFAULT 0")
+
+    issue_rows = connection.execute("PRAGMA table_info(issues)").fetchall()
+    issue_column_names = {row["name"] for row in issue_rows}
+    if "project_status" not in issue_column_names:
+        connection.execute("ALTER TABLE issues ADD COLUMN project_status TEXT")
 
 
 def record_issue_sync_result(
@@ -468,6 +475,7 @@ def save_issue(
     state: str,
     github_created_at: str,
     issue_number: int | None = None,
+    project_status: str = "",
 ) -> tuple[int, bool]:
     connection = get_db()
     existing = connection.execute(
@@ -482,10 +490,10 @@ def save_issue(
         connection.execute(
             """
             UPDATE issues
-            SET issue_number = ?, title = ?, body = ?, state = ?, github_created_at = ?
+            SET issue_number = ?, title = ?, body = ?, state = ?, project_status = ?, github_created_at = ?
             WHERE id = ?
             """,
-            (issue_number, title, body, state, github_created_at, existing["id"]),
+            (issue_number, title, body, state, project_status, github_created_at, existing["id"]),
         )
         connection.commit()
         return existing["id"], False
@@ -493,10 +501,10 @@ def save_issue(
     cursor = connection.execute(
         """
         INSERT INTO issues (
-            repository_id, github_issue_id, issue_number, title, body, state,
+            repository_id, github_issue_id, issue_number, title, body, state, project_status,
             github_created_at, created_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             repository_id,
@@ -505,6 +513,7 @@ def save_issue(
             title,
             body,
             state,
+            project_status,
             github_created_at,
             now_iso(),
         ),

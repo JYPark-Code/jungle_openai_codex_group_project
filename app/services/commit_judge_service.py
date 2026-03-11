@@ -14,7 +14,7 @@ from app.models.db import (
     update_commit_files,
 )
 from app.services.github_service import fetch_commit_changed_files
-from app.services.reporting_judgement_service import collapse_judgements_for_reporting, summarize_judgement_statuses
+from app.services.reporting_judgement_service import build_reporting_issue_entries, summarize_judgement_statuses
 from app.utils.errors import ApiError
 
 
@@ -168,12 +168,12 @@ def get_commit_judge_result(repository_id: int, sha: str) -> dict:
 
 def get_repository_problem_summary(repository_id: int) -> dict:
     issues = get_issues_by_repository_id(repository_id)
-    collapsed, extras = collapse_judgements_for_reporting(
-        list_problem_judgements_by_repository_id(repository_id),
+    tracked_entries, extras = build_reporting_issue_entries(
         issues,
+        list_problem_judgements_by_repository_id(repository_id),
         match_issue_by_filename,
     )
-    return summarize_judgement_statuses(collapsed + extras)
+    return summarize_judgement_statuses(tracked_entries + extras)
 
 
 def normalize_problem_filename(file_path: str) -> str:

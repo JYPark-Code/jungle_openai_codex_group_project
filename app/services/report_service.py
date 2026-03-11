@@ -145,7 +145,7 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
 
         summary["total_issue_count"] += 1
         status = best_status_by_issue.get(issue["issue_number"])
-        if not status and issue["state"] == "closed":
+        if issue["state"] == "closed":
             status = "solved"
 
         if status == "solved":

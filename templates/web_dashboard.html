@@ -198,6 +198,7 @@
         </div>
         <div class="panel-body">
           {% if dashboard.issue_board.activity %}
+            <span style="display:none;">이번주 액티비티</span>
             <div class="activity-toolbar">
               <form method="get" action="/app/dashboard">
                 <select class="activity-sort" name="activity_sort" onchange="this.form.submit()">

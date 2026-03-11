@@ -7,6 +7,7 @@ from app.models.db import (
     upsert_repository_for_user,
     upsert_user,
 )
+from app.services.web_app_service import build_dashboard_page_data, build_issue_board
 
 
 def ensure_web_context(app):
@@ -246,3 +247,102 @@ def test_demo_login_creates_session_and_redirects(client):
     with client.session_transaction() as session:
         assert session["auth_user_id"] == 1
         assert session["current_repository_full_name"] == "demo-org/homeschool-algorithms"
+
+
+def test_dashboard_progress_card_uses_required_template_count(app, monkeypatch):
+    with app.app_context():
+        repository_id = upsert_repository_for_user(
+            user_id=1,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="778",
+            default_branch="main",
+        )
+        repository = {
+            "id": repository_id,
+            "full_name": "JYPark-Code/SW-AI-W02-05",
+        }
+
+        monkeypatch.setattr(
+            "app.services.web_app_service.build_user_report",
+            lambda repository_id, report_scope="dashboard_page": {
+                "total_issue_count": 23,
+                "solved_count": 7,
+                "remaining_issue_count": 4,
+                "recommendations": [],
+                "weak_topics": [],
+            },
+        )
+        monkeypatch.setattr(
+            "app.services.web_app_service.build_issue_board",
+            lambda repository, activity_sort="issue_asc": {
+                "columns": {},
+                "summary": {},
+                "activity": [],
+                "week_label": "week2",
+            },
+        )
+        monkeypatch.setattr(
+            "app.services.web_app_service.build_template_status",
+            lambda repository_id: {
+                "required_template_count": 20,
+                "matched_count": 0,
+                "matched_issues": [],
+                "challenge_issue_count": 0,
+            },
+        )
+        monkeypatch.setattr(
+            "app.services.web_app_service.get_sync_status",
+            lambda repository_id: {"last_synced_at": None},
+        )
+
+        page = build_dashboard_page_data(repository)
+
+    assert page["progress_cards"][0]["value"] == 20
+
+
+def test_closed_issue_is_shown_as_done_in_issue_board(app):
+    with app.app_context():
+        user_id = upsert_user("5006", "closed-user", "closed user")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="779",
+            default_branch="main",
+        )
+        commit_id, _ = save_commit(
+            repository_id=repository_id,
+            sha="closed123",
+            message="close issue",
+            author_name="tester",
+            committed_at="2026-03-11T12:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="500",
+            issue_number=500,
+            title="파이썬 문법 - 최댓값",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=500,
+            problem_key="파이썬 문법 - 최댓값",
+            file_path="week2/max_value.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+
+        board = build_issue_board({"id": repository_id, "full_name": "JYPark-Code/SW-AI-W02-05"})
+
+    done_issue_numbers = {item["issue_number"] for item in board["columns"]["done"]}
+    in_progress_issue_numbers = {item["issue_number"] for item in board["columns"]["in_progress"]}
+
+    assert 500 in done_issue_numbers
+    assert 500 not in in_progress_issue_numbers

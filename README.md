@@ -43,7 +43,7 @@ SECRET_KEY=change-me-for-local-dev
 
 GITHUB_CLIENT_ID=your_github_oauth_client_id
 GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
-GITHUB_REDIRECT_URI=http://127.0.0.1:5000/api/auth/github/callback
+GITHUB_REDIRECT_URI=http://127.0.0.1:5000/auth/github/callback
 GITHUB_OAUTH_SCOPE=read:user
 
 FRONTEND_OAUTH_SUCCESS_URL=http://127.0.0.1:3000/auth/callback
@@ -65,7 +65,7 @@ REPO_NAME=SW-AI-W02-05
 GitHub에서 OAuth App을 만들고 아래처럼 설정합니다.
 
 - Homepage URL: `http://127.0.0.1:3000`
-- Authorization callback URL: `http://127.0.0.1:5000/api/auth/github/callback`
+- Authorization callback URL: `http://127.0.0.1:5000/auth/github/callback`
 
 ### 2. `.env` 설정
 

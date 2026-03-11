@@ -53,7 +53,7 @@ def test_load_issue_templates_reads_csv_files(tmp_path):
     assert len(templates) == 2
     assert templates[0]["title"] == "공통 - 학습 목표 확인"
     assert templates[0]["category"] == "common"
-    assert templates[0]["requirement_level"] == "required"
+    assert templates[0]["requirement_level"] == "excluded"
     assert templates[1]["track_type"] == "basic"
 
 

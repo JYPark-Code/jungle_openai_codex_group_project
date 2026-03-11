@@ -211,6 +211,13 @@ def normalize_title(title: str) -> str:
 
 
 KNOWN_CHALLENGE_NORMALIZED_TITLES = {normalize_title(title) for title in KNOWN_CHALLENGE_TITLES}
+KNOWN_DIFFICULTY_OVERRIDES = {
+    normalize_title("문자열 - 광고"): "high",
+    normalize_title("정수론 - 제곱 ㄴㄴ 수"): "high",
+    normalize_title("백트래킹 - 외판원 순회 2"): "high",
+    normalize_title("백트래킹 - N-Queen"): "high",
+    normalize_title("백트래킹 - 비숍"): "high",
+}
 
 
 def classify_issue_title(title: str) -> str:
@@ -259,6 +266,9 @@ def infer_requirement_level(
 
 def infer_difficulty_level(title: str, content: str) -> str:
     lowered = normalize_title(f"{title} {content}")
+    normalized_title = normalize_title(title)
+    if normalized_title in KNOWN_DIFFICULTY_OVERRIDES:
+        return KNOWN_DIFFICULTY_OVERRIDES[normalized_title]
     if "난이도하" in lowered or re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
         return "low"
     if "난이도중" in lowered or re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):

@@ -7,7 +7,6 @@
     <style>
       :root {
         --bg: #efefef;
-        --shell: transparent;
         --surface: #ffffff;
         --line: rgba(17, 24, 39, 0.1);
         --text-strong: #111111;
@@ -59,7 +58,7 @@
         line-height: 1.05;
       }
       .aside p {
-        color: rgba(245,247,251,0.68);
+        color: rgba(245, 247, 251, 0.68);
         line-height: 1.8;
       }
       .mock {
@@ -69,9 +68,9 @@
       }
       .mock-card {
         padding: 16px;
-        border: 1px solid rgba(255,255,255,0.08);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 18px;
-        background: rgba(255,255,255,0.04);
+        background: rgba(255, 255, 255, 0.04);
       }
       .main {
         background: #f7f7f8;
@@ -140,7 +139,7 @@
         z-index: 30;
         display: none;
         place-items: center;
-        background: rgba(239,239,239,0.72);
+        background: rgba(239, 239, 239, 0.72);
       }
       .loading-overlay.active {
         display: grid;
@@ -212,12 +211,12 @@
     <section class="wrap">
       <aside class="aside">
         <div class="brand">정글24<span>.</span></div>
-        <h1>GitHub OAuth로 바로 들어오는 알고리즘 학습 대시보드.</h1>
+        <h1>GitHub OAuth로 바로 들어오는 알고리즘 학습 대시보드</h1>
         <p>로그인 후 저장소를 선택하면 이슈, 커밋, 약점 분석, 추천 문제를 같은 흐름 안에서 볼 수 있습니다.</p>
         <div class="mock">
-          <div class="mock-card">Dashboard: 문제 진척도, 주차 보드, 추천 문제</div>
+          <div class="mock-card">Dashboard: 문제 진행률, 주차 보드, 추천 문제</div>
           <div class="mock-card">Commit Review: 커밋별 AI 리뷰와 코드 프리뷰</div>
-          <div class="mock-card">My Page: 5개 영역 상태, 약점 랭킹, 종합 분석</div>
+          <div class="mock-card">My Page: 5개 영역 상태, 약점 분석, 종합 리뷰</div>
         </div>
       </aside>
       <main class="main">
@@ -231,10 +230,13 @@
           {% endif %}
           {% if oauth_configured %}
             <a class="cta" href="/auth/github/start">GitHub로 로그인 / 회원가입</a>
+            <form method="post" action="/auth/demo-login">
+              <button class="cta" type="submit" style="margin-top: 10px; background: #111111;">데모로 둘러보기</button>
+            </form>
           {% else %}
             <div class="note">
-              OAuth 설정이 아직 없습니다. `.env`에 `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
-              `GITHUB_WEB_REDIRECT_URI`를 설정해야 실제 로그인 플로우가 동작합니다.
+              OAuth 설정이 아직 없습니다. `.env`의 `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+              `GITHUB_REDIRECT_URI`를 설정해야 실제 로그인 플로우가 동작합니다.
             </div>
           {% endif %}
         </div>

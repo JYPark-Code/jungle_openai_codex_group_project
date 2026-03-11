@@ -1,7 +1,7 @@
 import secrets
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from flask import Blueprint, current_app, redirect, request, session
+from flask import Blueprint, current_app, redirect, request, session, url_for
 
 from app.models.db import get_latest_repository_by_user_id, get_user_by_id, upsert_user
 from app.services.auth_service import handle_github_callback
@@ -59,12 +59,13 @@ def github_login():
 
 
 @auth_bp.get("/api/auth/github/callback")
+@auth_bp.get("/auth/github/callback")
 def github_callback():
     code = request.args.get("code", "").strip()
     state = request.args.get("state", "").strip()
     session_state = session.get("oauth_state", "")
     oauth_mode = session.get("oauth_mode", "json")
-    next_url = session.get("oauth_next_url") or current_app.config.get("FRONTEND_OAUTH_SUCCESS_URL", "")
+    next_url = session.get("oauth_next_url") or _default_success_url(oauth_mode)
 
     try:
         oauth_result = handle_github_callback(
@@ -88,7 +89,7 @@ def github_callback():
         _clear_oauth_session_keys()
 
         user = get_user_by_id(user_id)
-        if oauth_mode == "redirect":
+        if oauth_mode in {"redirect", "web"}:
             return redirect(_append_query_params(next_url, {"status": "success"}))
 
         return success_response(
@@ -97,8 +98,8 @@ def github_callback():
         )
     except ApiError as error:
         _clear_oauth_session_keys()
-        if oauth_mode == "redirect":
-            failure_url = current_app.config.get("FRONTEND_OAUTH_FAILURE_URL", "")
+        if oauth_mode in {"redirect", "web"}:
+            failure_url = _default_failure_url(oauth_mode)
             return redirect(
                 _append_query_params(
                     failure_url,
@@ -132,14 +133,18 @@ def _generate_state() -> str:
 
 def _resolve_oauth_mode() -> str:
     mode = (request.args.get("mode") or "").strip().lower()
-    return "redirect" if mode == "redirect" else "json"
+    if mode == "redirect":
+        return "redirect"
+    if mode == "web":
+        return "web"
+    return "json"
 
 
 def _resolve_next_url() -> str:
     requested_next_url = (request.args.get("next") or "").strip()
     if requested_next_url and _is_allowed_frontend_url(requested_next_url):
         return requested_next_url
-    return current_app.config.get("FRONTEND_OAUTH_SUCCESS_URL", "")
+    return _default_success_url(_resolve_oauth_mode())
 
 
 def _is_allowed_frontend_url(url: str) -> bool:
@@ -171,6 +176,18 @@ def _extract_origin(url: str) -> str:
     if not parsed_url.scheme or not parsed_url.netloc:
         return ""
     return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
+
+def _default_success_url(oauth_mode: str) -> str:
+    if oauth_mode == "web":
+        return url_for("web.dashboard_page")
+    return current_app.config.get("FRONTEND_OAUTH_SUCCESS_URL", "")
+
+
+def _default_failure_url(oauth_mode: str) -> str:
+    if oauth_mode == "web":
+        return url_for("web.login_page")
+    return current_app.config.get("FRONTEND_OAUTH_FAILURE_URL", "")
 
 
 def _clear_oauth_session_keys():

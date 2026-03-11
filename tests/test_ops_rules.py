@@ -288,3 +288,13 @@ def test_report_treats_high_difficulty_filename_as_challenge(app, monkeypatch):
     assert report["challenge_count"] == 1
     assert report["solved_count"] == 0
     assert report["attempted_count"] == 0
+
+
+def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
+    templates = load_issue_templates(Path("resources/csv"))
+    week2_required = [
+        item for item in templates
+        if item["week_label"] == "week2" and item["requirement_level"] == "required"
+    ]
+
+    assert len(week2_required) == 20

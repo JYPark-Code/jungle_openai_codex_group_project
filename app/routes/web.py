@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
-from app.models.db import get_repository_by_id, get_user_by_id, upsert_repository_for_user, upsert_user
-from app.services.auth_service import handle_github_callback
+from app.models.db import get_repository_by_id, get_user_by_id, upsert_repository_for_user
 from app.services.code_review import create_commit_review
 from app.services.commit_judge_service import judge_commit_files
 from app.services.demo_service import ensure_demo_workspace
@@ -42,7 +41,7 @@ def login_page():
 @web_bp.get("/auth/github/start")
 def github_start():
     client_id = current_app.config.get("GITHUB_CLIENT_ID", "")
-    redirect_uri = current_app.config.get("GITHUB_WEB_REDIRECT_URI", "")
+    redirect_uri = current_app.config.get("GITHUB_REDIRECT_URI", "")
     scope = current_app.config.get("GITHUB_OAUTH_SCOPE", "read:user")
 
     if not client_id or not redirect_uri:
@@ -50,6 +49,8 @@ def github_start():
 
     state = _handle_state_generation()
     session["oauth_state"] = state
+    session["oauth_mode"] = "web"
+    session["oauth_next_url"] = url_for("web.dashboard_page")
     session.permanent = True
 
     return redirect(
@@ -60,36 +61,6 @@ def github_start():
             scope=scope,
         )
     )
-
-
-@web_bp.get("/auth/github/callback")
-def github_callback_web():
-    try:
-        oauth_result = handle_github_callback(
-            code=request.args.get("code", "").strip(),
-            received_state=request.args.get("state", "").strip(),
-            expected_state=session.get("oauth_state", ""),
-            client_id=current_app.config.get("GITHUB_CLIENT_ID", ""),
-            client_secret=current_app.config.get("GITHUB_CLIENT_SECRET", ""),
-            redirect_uri=current_app.config.get("GITHUB_WEB_REDIRECT_URI", ""),
-        )
-    except Exception as error:
-        session.pop("oauth_state", None)
-        message = getattr(error, "message", "GitHub 로그인 중 오류가 발생했습니다.")
-        return redirect(url_for("web.login_page", error=message))
-
-    user_id = upsert_user(
-        github_user_id=str(oauth_result["github_user"]["id"]),
-        github_login=oauth_result["github_user"]["login"],
-        github_name=oauth_result["github_user"].get("name") or "",
-    )
-
-    session["oauth_access_token"] = oauth_result["access_token"]
-    session["auth_user_id"] = user_id
-    session.pop("oauth_state", None)
-    flash("GitHub 로그인에 성공했습니다.", "success")
-
-    return redirect(url_for("web.dashboard_page"))
 
 
 @web_bp.post("/auth/logout")
@@ -292,7 +263,7 @@ def _web_oauth_is_configured() -> bool:
     return bool(
         current_app.config.get("GITHUB_CLIENT_ID", "")
         and current_app.config.get("GITHUB_CLIENT_SECRET", "")
-        and current_app.config.get("GITHUB_WEB_REDIRECT_URI", "")
+        and current_app.config.get("GITHUB_REDIRECT_URI", "")
     )
 
 

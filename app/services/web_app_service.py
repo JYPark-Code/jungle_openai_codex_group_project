@@ -16,7 +16,7 @@ from app.services.commit_judge_service import (
     list_repository_commits,
 )
 from app.services.github_service import fetch_commit_changed_files, fetch_file_content_at_ref
-from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue, normalize_title
+from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue
 from app.services.recommendation_service import generate_recommendations
 from app.services.report_service import build_user_report
 from app.utils.errors import ApiError
@@ -62,7 +62,10 @@ def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc"
         "repository": repository,
         "report": report,
         "progress_cards": [
-            {"label": "전체 필수 문제", "value": report["total_issue_count"]},
+            {
+                "label": "전체 필수 문제",
+                "value": template_status.get("required_template_count", report["total_issue_count"]),
+            },
             {"label": "푼 문제", "value": report["solved_count"]},
             {"label": "남은 문제", "value": report["remaining_issue_count"]},
         ],
@@ -87,14 +90,15 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
     challenge_issue_numbers = _build_challenge_issue_numbers(judgements)
     best_status_by_issue = _build_issue_status_map(judgements)
 
-    current_week_key = _pick_current_week_key(issues)
+    current_week_key = template_status.get("active_week") or _pick_current_week_key(issues)
     current_week_issues = []
 
     for issue in issues:
-        if current_week_key and _extract_week_key(issue["title"]) != current_week_key:
+        issue_meta = issue_meta_map.get(issue["issue_number"], {})
+        issue_week_key = issue_meta.get("week_label") or _extract_week_key(issue["title"])
+        if current_week_key and issue_week_key != current_week_key:
             continue
 
-        issue_meta = issue_meta_map.get(issue["issue_number"], {})
         if is_common_issue(issue_meta):
             continue
 
@@ -102,29 +106,28 @@ def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dic
             status_key = "challenge"
         else:
             status_key = best_status_by_issue.get(issue["issue_number"])
-            if not status_key and issue["state"] == "closed":
+            if issue["state"] == "closed":
                 status_key = "solved"
             if not status_key:
                 status_key = "not_started"
 
-        item = {
-            "issue_number": issue["issue_number"],
-            "title": issue["title"],
-            "state": issue["state"],
-            "status_key": status_key,
-            "status_label": STATUS_COPY[status_key],
-            "issue_url": _build_issue_url(repository["full_name"], issue["issue_number"]),
-        }
-        current_week_issues.append(item)
+        current_week_issues.append(
+            {
+                "issue_number": issue["issue_number"],
+                "title": issue["title"],
+                "state": issue["state"],
+                "status_key": status_key,
+                "status_label": STATUS_COPY[status_key],
+                "issue_url": _build_issue_url(repository["full_name"], issue["issue_number"]),
+            }
+        )
 
     _sort_issue_activity(current_week_issues, activity_sort)
 
     columns = {
         "todo": [item for item in current_week_issues if item["status_key"] == "not_started"],
         "in_progress": [
-            item
-            for item in current_week_issues
-            if item["status_key"] in {"attempted", "possibly_solved"}
+            item for item in current_week_issues if item["status_key"] in {"attempted", "possibly_solved"}
         ],
         "done": [item for item in current_week_issues if item["status_key"] == "solved"],
         "challenge": [item for item in current_week_issues if item["status_key"] == "challenge"],
@@ -345,7 +348,7 @@ def _build_challenge_issue_numbers(judgements: list[dict]) -> set[int]:
         file_path = item.get("file_path", "") or ""
         if issue_number is None:
             continue
-        if file_path.split("/")[-1].startswith("난이도상_"):
+        if file_path.split("/")[-1].startswith("?쒖씠?꾩긽_"):
             challenge_issue_numbers.add(issue_number)
     return challenge_issue_numbers
 
@@ -398,7 +401,7 @@ def _format_display_date(value: str | None) -> str:
 
 def _format_display_datetime(value: str | None) -> str:
     if not value:
-        return "시각 정보 없음"
+        return "시간 정보 없음"
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
@@ -415,9 +418,9 @@ def _build_template_status_note(template_status: dict) -> str:
     if not active_total:
         return "현재 주차에 해당하는 템플릿이 없습니다."
     if not active_connected and overall_connected:
-        return "전체 연결 이슈는 있지만 현재 주차에 매칭된 이슈가 없습니다."
+        return "전체 연결 이슈는 있지만 현재 주차와 매칭된 이슈가 없습니다."
     return (
-        f"현재 주차 연결 {active_connected}건, 전체 연결 {overall_connected}건이며, "
+        f"현재 주차 연결 {active_connected}건, 전체 연결 {overall_connected}건이며 "
         f"도전 문제는 {challenge_count}건입니다."
     )
 

@@ -1,5 +1,6 @@
 from app.models.db import (
     save_commit,
+    save_issue,
     save_problem_judgement,
     upsert_repository_for_user,
     upsert_user,
@@ -60,6 +61,15 @@ def test_skill_map_statistics(app):
     repository_id, commit_id = ensure_review_context(app)
 
     with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="100",
+            issue_number=1,
+            title="graph bfs search",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
         save_problem_judgement(
             repository_id=repository_id,
             commit_id=commit_id,
@@ -83,6 +93,75 @@ def test_skill_map_statistics(app):
         skill_map = build_skill_map(repository_id)
 
     assert skill_map["domains"]
+
+
+def test_skill_map_treats_closed_issue_as_solved(app):
+    repository_id, commit_id = ensure_review_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="101",
+            issue_number=11,
+            title="[WEEK2] 문자열 - IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=11,
+            problem_key="[WEEK2] 문자열 - IPv6",
+            file_path="week2/string_ipv6.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+
+        skill_map = build_skill_map(repository_id)
+
+    string_domains = [item for item in skill_map["domains"] if item["total"] > 0]
+    assert any(item["solved"] >= 1 for item in string_domains)
+
+
+def test_skill_map_uses_best_status_per_issue(app):
+    repository_id, commit_id = ensure_review_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="102",
+            issue_number=12,
+            title="[WEEK2] 그래프 - BFS",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=12,
+            problem_key="[WEEK2] 그래프 - BFS",
+            file_path="week2/graph_bfs.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=12,
+            problem_key="[WEEK2] 그래프 - BFS",
+            file_path="week2/graph_bfs.py",
+            judgement_status="possibly_solved",
+            match_score=0.8,
+            matched_by_filename=True,
+        )
+
+        skill_map = build_skill_map(repository_id)
+
+    active_domains = [item for item in skill_map["domains"] if item["total"] > 0]
+    assert any(item["possibly_solved"] >= 1 for item in active_domains)
+    assert all(item["total"] == item["solved"] + item["possibly_solved"] + item["attempted"] for item in active_domains)
 
 
 def test_commit_review_generation(client, app, monkeypatch):

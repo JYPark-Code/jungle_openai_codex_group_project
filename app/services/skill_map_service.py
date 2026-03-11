@@ -1,7 +1,11 @@
 import re
 from collections import defaultdict
 
-from app.models.db import get_problem_summary_by_repository_id, list_problem_judgements_by_repository_id
+from app.models.db import (
+    get_issues_by_repository_id,
+    get_problem_summary_by_repository_id,
+    list_problem_judgements_by_repository_id,
+)
 
 
 ALGORITHM_TAXONOMY = {
@@ -18,7 +22,7 @@ CATEGORY_KEYWORDS = {
     "사고력": ["사고력", "아이디어", "관찰"],
     "시뮬레이션": ["시뮬레이션", "simulation"],
     "재귀": ["재귀", "recursion"],
-    "수학": ["수학", "math", "정수론", "소수", "조합", "확률"],
+    "수학": ["수학", "math", "정수론", "소수", "조합", "제곱"],
     "그래프": ["그래프", "graph"],
     "배열": ["배열", "array", "list"],
     "스택": ["스택", "stack"],
@@ -68,10 +72,12 @@ def match_categories_from_text(*texts: str) -> list[str]:
 
 def build_skill_map(repository_id: int) -> dict:
     judgements = list_problem_judgements_by_repository_id(repository_id)
+    issues = get_issues_by_repository_id(repository_id)
+    issue_state_map = {item["issue_number"]: item["state"] for item in issues if item.get("issue_number") is not None}
     reverse_mapping = build_reverse_taxonomy()
     domain_stats = defaultdict(lambda: {"name": "", "total": 0, "solved": 0, "possibly_solved": 0, "attempted": 0})
 
-    for judgement in judgements:
+    for judgement in _collapse_judgements(judgements, issue_state_map):
         categories = match_categories_from_text(judgement["problem_key"], judgement.get("file_path", ""))
         domains = {reverse_mapping[category] for category in categories if category in reverse_mapping}
         for domain in domains:
@@ -92,3 +98,30 @@ def build_skill_map(repository_id: int) -> dict:
         "domains": domains,
         "summary": summary,
     }
+
+
+def _collapse_judgements(judgements: list[dict], issue_state_map: dict[int, str]) -> list[dict]:
+    priority = {"attempted": 1, "possibly_solved": 2, "solved": 3}
+    best_by_issue = {}
+    extras = []
+
+    for judgement in judgements:
+        issue_number = judgement.get("issue_number")
+        if issue_number is None:
+            extras.append(judgement)
+            continue
+
+        current = best_by_issue.get(issue_number)
+        next_status = judgement["judgement_status"]
+        if current is None or priority.get(next_status, 0) > priority.get(current["judgement_status"], 0):
+            best_by_issue[issue_number] = dict(judgement)
+
+    collapsed = []
+    for issue_number, judgement in best_by_issue.items():
+        normalized = dict(judgement)
+        if issue_state_map.get(issue_number) == "closed":
+            normalized["judgement_status"] = "solved"
+        collapsed.append(normalized)
+
+    collapsed.extend(extras)
+    return collapsed

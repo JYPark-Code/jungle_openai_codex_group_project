@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 
 from app.models.db import (
     get_active_github_project,
@@ -109,6 +110,25 @@ def test_required_progress_uses_active_week_only(app, tmp_path):
     assert status["required_template_count"] == 2
     assert status["required_matched_count"] == 2
     assert status["required_progress"] == 1.0
+
+
+def test_active_week_is_selected_automatically_by_friday_schedule(app, tmp_path, monkeypatch):
+    repository_id, _commit_id = ensure_ops_context(app)
+    make_csv(tmp_path, "week2_issues_complete.csv", [("basic - 배열 연습", "")])
+    make_csv(tmp_path, "week3_issues_complete.csv", [("basic - 큐 연습", "")])
+    make_csv(tmp_path, "week4_issues_complete.csv", [("basic - 트리 연습", "")])
+
+    class FakeDateTime:
+        @classmethod
+        def now(cls):
+            return datetime(2026, 3, 13, 9, 0, 0)
+
+    monkeypatch.setattr("app.services.issue_template_service.datetime", FakeDateTime)
+
+    with app.app_context():
+        status = build_template_status(repository_id, tmp_path)
+
+    assert status["active_week"] == "week3"
 
 
 def test_report_excludes_unmatched_extra_commits_from_progress(app, monkeypatch):

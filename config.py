@@ -27,4 +27,4 @@ class TestingConfig(Config):
     GITHUB_REDIRECT_URI = "http://localhost/test/callback"
     REPO_OWNER = "test-owner"
     REPO_NAME = "test-repo"
-    ACTIVE_WEEK = "week2"
+    ACTIVE_WEEK = ""

@@ -1,5 +1,6 @@
 import csv
 import re
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from flask import current_app
@@ -9,6 +10,7 @@ from app.services.github_service import create_issue_with_access_token
 
 
 DEFAULT_TEMPLATE_DIRECTORY = Path("resources/csv")
+WEEK3_START_DATE = date(2026, 3, 13)
 
 
 def load_issue_templates(template_directory: str | Path = DEFAULT_TEMPLATE_DIRECTORY) -> list[dict]:
@@ -90,6 +92,8 @@ def build_template_status(
         for item in matched
         if item["week_label"] == selected_week and item["requirement_level"] == "required"
     }
+    active_matched = [item for item in matched if item["week_label"] == selected_week] if selected_week else []
+    active_missing = [item for item in missing if item["week_label"] == selected_week] if selected_week else []
 
     required_progress = (
         len(matched_required_titles) / len(required_active_templates)
@@ -106,8 +110,10 @@ def build_template_status(
         "required_template_count": len(required_active_templates),
         "required_matched_count": len(matched_required_titles),
         "required_progress": round(required_progress, 2),
-        "matched_issues": matched,
-        "missing_issues": missing,
+        "matched_issues": active_matched if selected_week else matched,
+        "missing_issues": active_missing if selected_week else missing,
+        "all_matched_issues": matched,
+        "all_missing_issues": missing,
     }
 
 
@@ -245,23 +251,37 @@ def determine_active_week(templates: list[dict], matched_issues: list[dict]) -> 
     if configured_week:
         return configured_week
 
-    matched_weeks = sorted(
-        {item["week_label"] for item in matched_issues if item["week_label"].startswith("week")},
-        key=_week_sort_key,
-    )
-    if matched_weeks:
-        return matched_weeks[-1]
-
     available_weeks = sorted(
         {item["week_label"] for item in templates if item["week_label"].startswith("week")},
         key=_week_sort_key,
     )
-    return available_weeks[0] if available_weeks else None
+    if not available_weeks:
+        return None
+
+    today = datetime.now().date()
+    if today < WEEK3_START_DATE and "week2" in available_weeks:
+        return "week2"
+
+    selected_week = available_weeks[0]
+    for week_label in available_weeks:
+        week_number = _extract_week_number(week_label)
+        if week_number <= 2:
+            start_date = WEEK3_START_DATE - timedelta(days=7)
+        else:
+            start_date = WEEK3_START_DATE + timedelta(days=7 * (week_number - 3))
+        if today >= start_date:
+            selected_week = week_label
+
+    return selected_week
 
 
 def _week_sort_key(week_label: str) -> tuple[int, str]:
+    return (_extract_week_number(week_label), week_label)
+
+
+def _extract_week_number(week_label: str) -> int:
     match = re.search(r"(\d+)", week_label)
-    return (int(match.group(1)) if match else 0, week_label)
+    return int(match.group(1)) if match else 0
 
 
 def _read_csv_rows(csv_path: Path) -> list[dict]:

@@ -355,6 +355,61 @@ def test_report_counts_closed_challenge_issue_as_solved(app, monkeypatch):
     assert report["attempted_count"] == 0
 
 
+def test_report_counts_closed_issue_from_orphan_judgement_as_solved(app, monkeypatch):
+    repository_id, commit_id = ensure_ops_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="closed-23",
+            issue_number=23,
+            title="[WEEK2] 臾몄옄??- IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=None,
+            problem_key="?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            file_path="week2/problem-solving/?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            judgement_status="attempted",
+            match_score=0.0,
+        )
+
+    monkeypatch.setattr(
+        "app.services.report_service.build_template_status",
+        lambda repository_id: {
+            "active_week": "week2",
+            "template_count": 1,
+            "matched_count": 1,
+            "missing_count": 0,
+            "required_template_count": 0,
+            "required_matched_count": 0,
+            "required_progress": 0.0,
+            "matched_issues": [],
+            "missing_issues": [],
+            "all_matched_issues": [],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.get_recommendations",
+        lambda repository_id: {"weak_topics": [], "recommendations": []},
+    )
+    monkeypatch.setattr(
+        "app.services.report_service.rank_weak_topics",
+        lambda repository_id, limit=5: [],
+    )
+
+    with app.app_context():
+        report = build_user_report(repository_id)
+
+    assert report["solved_count"] == 1
+    assert report["attempted_count"] == 0
+    assert report["extra_practice_count"] == 0
+
+
 def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
     templates = load_issue_templates(Path("resources/csv"))
     week2_required = [
@@ -364,5 +419,7 @@ def test_week2_required_issue_count_uses_basic_and_non_challenge_only():
     required_titles = {item["title"] for item in week2_required}
 
     assert len(week2_required) == 20
+    assert "문자열 - IPv6" in required_titles
+    assert "재귀함수 - 하노이 탑" in required_titles
     assert "백트래킹 - 외판원 순회 2" in required_titles
     assert "백트래킹 - N-Queen" in required_titles

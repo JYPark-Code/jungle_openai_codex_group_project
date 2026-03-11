@@ -7,6 +7,8 @@ from app.models.db import (
     list_recommendations_by_repository_id,
     save_recommendation,
 )
+from app.services.commit_judge_service import match_issue_by_filename
+from app.services.reporting_judgement_service import collapse_judgements_for_reporting
 from app.services.skill_map_service import CATEGORY_KEYWORDS, match_categories_from_text
 
 
@@ -17,23 +19,35 @@ RECOMMENDATION_POOL = {
             "topic": "구현",
             "url": "https://www.acmicpc.net/problem/14503",
             "source": "baekjoon",
-        }
+        },
+        {
+            "title": "문자열 압축",
+            "topic": "구현",
+            "url": "https://school.programmers.co.kr/learn/courses/30/lessons/60057",
+            "source": "programmers",
+        },
     ],
     "문자열": [
+        {
+            "title": "광고",
+            "topic": "문자열",
+            "url": "https://www.acmicpc.net/problem/1305",
+            "source": "baekjoon",
+        },
         {
             "title": "문자열 압축",
             "topic": "문자열",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/60057",
             "source": "programmers",
-        }
+        },
     ],
     "사고력": [
         {
-            "title": "아이디어 회의",
+            "title": "Project Euler 1",
             "topic": "사고력",
             "url": "https://projecteuler.net/problem=1",
             "source": "project-euler",
-        }
+        },
     ],
     "시뮬레이션": [
         {
@@ -41,7 +55,7 @@ RECOMMENDATION_POOL = {
             "topic": "시뮬레이션",
             "url": "https://www.acmicpc.net/problem/14503",
             "source": "baekjoon",
-        }
+        },
     ],
     "재귀": [
         {
@@ -49,7 +63,13 @@ RECOMMENDATION_POOL = {
             "topic": "재귀",
             "url": "https://www.acmicpc.net/problem/17478",
             "source": "baekjoon",
-        }
+        },
+        {
+            "title": "하노이 탑",
+            "topic": "재귀",
+            "url": "https://www.acmicpc.net/problem/1914",
+            "source": "baekjoon",
+        },
     ],
     "수학": [
         {
@@ -57,7 +77,13 @@ RECOMMENDATION_POOL = {
             "topic": "수학",
             "url": "https://www.acmicpc.net/problem/1978",
             "source": "baekjoon",
-        }
+        },
+        {
+            "title": "골드바흐의 추측",
+            "topic": "수학",
+            "url": "https://www.acmicpc.net/problem/9020",
+            "source": "baekjoon",
+        },
     ],
     "그래프": [
         {
@@ -65,7 +91,7 @@ RECOMMENDATION_POOL = {
             "topic": "그래프",
             "url": "https://www.acmicpc.net/problem/1012",
             "source": "baekjoon",
-        }
+        },
     ],
     "배열": [
         {
@@ -73,7 +99,7 @@ RECOMMENDATION_POOL = {
             "topic": "배열",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/68644",
             "source": "programmers",
-        }
+        },
     ],
     "스택": [
         {
@@ -81,7 +107,7 @@ RECOMMENDATION_POOL = {
             "topic": "스택",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/12909",
             "source": "programmers",
-        }
+        },
     ],
     "큐": [
         {
@@ -89,7 +115,7 @@ RECOMMENDATION_POOL = {
             "topic": "큐",
             "url": "https://www.acmicpc.net/problem/2164",
             "source": "baekjoon",
-        }
+        },
     ],
     "트리": [
         {
@@ -97,7 +123,7 @@ RECOMMENDATION_POOL = {
             "topic": "트리",
             "url": "https://leetcode.com/problems/maximum-depth-of-binary-tree/",
             "source": "leetcode",
-        }
+        },
     ],
     "해시": [
         {
@@ -105,7 +131,7 @@ RECOMMENDATION_POOL = {
             "topic": "해시",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42576",
             "source": "programmers",
-        }
+        },
     ],
     "힙": [
         {
@@ -113,7 +139,7 @@ RECOMMENDATION_POOL = {
             "topic": "힙",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42626",
             "source": "programmers",
-        }
+        },
     ],
     "정렬": [
         {
@@ -121,7 +147,7 @@ RECOMMENDATION_POOL = {
             "topic": "정렬",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42748",
             "source": "programmers",
-        }
+        },
     ],
     "BFS": [
         {
@@ -129,7 +155,7 @@ RECOMMENDATION_POOL = {
             "topic": "BFS",
             "url": "https://www.acmicpc.net/problem/2178",
             "source": "baekjoon",
-        }
+        },
     ],
     "DFS": [
         {
@@ -137,7 +163,13 @@ RECOMMENDATION_POOL = {
             "topic": "DFS",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/43165",
             "source": "programmers",
-        }
+        },
+        {
+            "title": "N-Queen",
+            "topic": "DFS",
+            "url": "https://www.acmicpc.net/problem/9663",
+            "source": "baekjoon",
+        },
     ],
     "그리디": [
         {
@@ -145,7 +177,7 @@ RECOMMENDATION_POOL = {
             "topic": "그리디",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42883",
             "source": "programmers",
-        }
+        },
     ],
     "다이나믹프로그래밍": [
         {
@@ -153,7 +185,7 @@ RECOMMENDATION_POOL = {
             "topic": "다이나믹프로그래밍",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/43105",
             "source": "programmers",
-        }
+        },
     ],
     "완전탐색": [
         {
@@ -161,7 +193,7 @@ RECOMMENDATION_POOL = {
             "topic": "완전탐색",
             "url": "https://school.programmers.co.kr/learn/courses/30/lessons/42840",
             "source": "programmers",
-        }
+        },
     ],
     "이분탐색": [
         {
@@ -169,7 +201,7 @@ RECOMMENDATION_POOL = {
             "topic": "이분탐색",
             "url": "https://www.acmicpc.net/problem/1654",
             "source": "baekjoon",
-        }
+        },
     ],
     "최단경로": [
         {
@@ -177,7 +209,7 @@ RECOMMENDATION_POOL = {
             "topic": "최단경로",
             "url": "https://www.acmicpc.net/problem/1753",
             "source": "baekjoon",
-        }
+        },
     ],
     "탐색": [
         {
@@ -185,7 +217,7 @@ RECOMMENDATION_POOL = {
             "topic": "탐색",
             "url": "https://leetcode.com/problems/binary-search/",
             "source": "leetcode",
-        }
+        },
     ],
 }
 
@@ -197,11 +229,12 @@ def calculate_weak_topics(repository_id: int, limit: int = 3) -> list[str]:
 
 def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
     issues = get_issues_by_repository_id(repository_id)
-    issue_state_map = {item["issue_number"]: item["state"] for item in issues if item.get("issue_number") is not None}
-    judgements = _collapse_judgements(
+    collapsed, extras = collapse_judgements_for_reporting(
         list_problem_judgements_by_repository_id(repository_id),
-        issue_state_map,
+        issues,
+        match_issue_by_filename,
     )
+    judgements = collapsed + extras
     recent_topics = Counter(list_recent_commit_topics_by_repository_id(repository_id))
     category_stats = {
         category: {"total": 0, "solved": 0, "attempted_like": 0}
@@ -220,14 +253,14 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
 
     scored_topics = []
     for category, stats in category_stats.items():
-        if stats["total"] == 0 and recent_topics[category] == 0:
+        if stats["total"] == 0:
             continue
 
         solved_ratio = stats["solved"] / stats["total"] if stats["total"] else 0.0
         attempted_gap = 0.0
         if stats["attempted_like"] > 0:
             attempted_gap = 1 - (stats["solved"] / max(stats["attempted_like"], 1))
-        recency_penalty = 0.35 if recent_topics[category] == 0 else 0.0
+        recency_penalty = 0.35 if recent_topics[category] == 0 and solved_ratio < 1.0 else 0.0
         base_penalty = 1 - solved_ratio
         score = base_penalty + attempted_gap + recency_penalty
 
@@ -247,33 +280,6 @@ def rank_weak_topics(repository_id: int, limit: int = 5) -> list[dict]:
 
     scored_topics.sort(key=lambda item: (-item["score"], item["topic"]))
     return scored_topics[:limit]
-
-
-def _collapse_judgements(judgements: list[dict], issue_state_map: dict[int, str]) -> list[dict]:
-    priority = {"attempted": 1, "possibly_solved": 2, "solved": 3}
-    best_by_issue = {}
-    extras = []
-
-    for judgement in judgements:
-        issue_number = judgement.get("issue_number")
-        if issue_number is None:
-            extras.append(dict(judgement))
-            continue
-
-        current = best_by_issue.get(issue_number)
-        next_status = judgement["judgement_status"]
-        if current is None or priority.get(next_status, 0) > priority.get(current["judgement_status"], 0):
-            best_by_issue[issue_number] = dict(judgement)
-
-    collapsed = []
-    for issue_number, judgement in best_by_issue.items():
-        normalized = dict(judgement)
-        if issue_state_map.get(issue_number) == "closed":
-            normalized["judgement_status"] = "solved"
-        collapsed.append(normalized)
-
-    collapsed.extend(extras)
-    return collapsed
 
 
 def generate_recommendations(repository_id: int, limit: int = 3) -> dict:
@@ -316,27 +322,27 @@ def generate_recommendations(repository_id: int, limit: int = 3) -> dict:
 
 def get_recommendations(repository_id: int) -> dict:
     weak_topics = calculate_weak_topics(repository_id)
+    weak_topic_set = set(weak_topics)
+    recommendations = [
+        item
+        for item in list_recommendations_by_repository_id(repository_id)
+        if is_valid_recommendation(item) and item.get("topic") in weak_topic_set
+    ]
     return {
         "weak_topics": weak_topics,
-        "recommendations": [
-            item
-            for item in list_recommendations_by_repository_id(repository_id)
-            if is_valid_recommendation(item)
-        ],
+        "recommendations": recommendations,
     }
 
 
 def build_recommendation_reason(topic: str) -> str:
-    return f"{topic} 유형 풀이 비중이 낮아 보강이 필요합니다."
+    return f"{topic} 유형의 풀이 비율이 낮아 보강이 필요합니다."
 
 
 def is_valid_recommendation(item: dict) -> bool:
     url = str(item.get("url", "")).strip()
     title = str(item.get("title", "")).strip()
-    if not url:
+    if not url or not title:
         return False
     if url == "https://www.acmicpc.net/":
-        return False
-    if title == "상하좌우":
         return False
     return True

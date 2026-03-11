@@ -143,6 +143,30 @@ def test_issue_matching_keeps_specific_backtracking_problem():
     assert result["score"] >= 0.6
 
 
+def test_issue_matching_handles_compound_korean_problem_names():
+    issues = [
+        {"title": "[WEEK2] 재귀함수 - 하노이 탑", "issue_number": 25},
+    ]
+
+    result = match_issue_by_filename("week2/problem-solving/난이도중_재귀함수_하노이탑백준골드5.py", issues)
+
+    assert result["issue"]["issue_number"] == 25
+    assert result["is_strong_match"] is True
+    assert result["score"] >= 0.6
+
+
+def test_issue_matching_handles_hyphenated_english_tokens():
+    issues = [
+        {"title": "[WEEK2] 백트래킹 - N-Queen", "issue_number": 27},
+    ]
+
+    result = match_issue_by_filename("week2/problem-solving/난이도중_백트래킹_NQueen_골드4.py", issues)
+
+    assert result["issue"]["issue_number"] == 27
+    assert result["is_strong_match"] is True
+    assert result["score"] >= 0.6
+
+
 def test_analysis_result_is_saved_and_can_be_read(client, app, monkeypatch):
     repository_id, commit_id = ensure_commit_context(app)
     login_with_repository_and_user(client, repository_id)
@@ -276,6 +300,36 @@ def test_repository_problem_summary_counts_all_statuses(app):
     assert summary["possibly_solved_count"] == 1
     assert summary["solved_count"] == 1
     assert summary["total_count"] == 3
+
+
+def test_repository_problem_summary_recovers_closed_issue_from_orphan_judgement(app):
+    repository_id, commit_id = ensure_commit_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="closed-ipv6",
+            issue_number=23,
+            title="[WEEK2] 臾몄옄??- IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=None,
+            problem_key="?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            file_path="week2/problem-solving/?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            judgement_status="attempted",
+            match_score=0.0,
+        )
+
+        summary = get_repository_problem_summary(repository_id)
+
+    assert summary["attempted_count"] == 0
+    assert summary["solved_count"] == 1
+    assert summary["total_count"] == 1
 
 
 def test_high_difficulty_filename_normalization():

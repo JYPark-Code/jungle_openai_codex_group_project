@@ -13,9 +13,12 @@ from app.services.github_service import create_issue_with_access_token
 
 DEFAULT_TEMPLATE_DIRECTORY = Path("resources/csv")
 WEEK3_START_DATE = date(2026, 3, 13)
-KNOWN_CHALLENGE_TITLES = {
+KNOWN_HIGH_DIFFICULTY_TITLES = {
     "문자열 - 광고",
+    "백트래킹 - 비숍",
     "정수론 - 제곱 ㄴㄴ 수",
+    "완전탐색 - 차이를 최대로",
+    "정수론 - 골드바흐의 추측",
 }
 
 
@@ -87,12 +90,7 @@ def build_template_status(
                 }
             )
         else:
-            missing.append(
-                {
-                    **base_payload,
-                    "content": template["content"],
-                }
-            )
+            missing.append({**base_payload, "content": template["content"]})
 
     selected_week = active_week or determine_active_week(templates, matched)
     active_templates = [item for item in templates if item["week_label"] == selected_week] if selected_week else []
@@ -100,11 +98,7 @@ def build_template_status(
     active_missing = [item for item in missing if item["week_label"] == selected_week] if selected_week else []
 
     required_active_templates = [item for item in active_templates if is_required_coding_issue(item)]
-    matched_required_titles = {
-        item["title"]
-        for item in active_matched
-        if is_required_coding_issue(item)
-    }
+    matched_required_titles = {item["title"] for item in active_matched if is_required_coding_issue(item)}
     challenge_active_issues = [item for item in (active_matched + active_missing) if is_challenge_issue(item)]
 
     required_progress = (
@@ -207,13 +201,8 @@ def normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", normalized).casefold()
 
 
-KNOWN_CHALLENGE_NORMALIZED_TITLES = {normalize_title(title) for title in KNOWN_CHALLENGE_TITLES}
-KNOWN_DIFFICULTY_OVERRIDES = {
-    normalize_title("문자열 - 광고"): "high",
-    normalize_title("정수론 - 제곱 ㄴㄴ 수"): "high",
-    normalize_title("문자열 - IPv6"): "high",
-    normalize_title("재귀함수 - 하노이 탑"): "high",
-    normalize_title("백트래킹 - 비숍"): "high",
+KNOWN_HIGH_DIFFICULTY_NORMALIZED_TITLES = {
+    normalize_title(title) for title in KNOWN_HIGH_DIFFICULTY_TITLES
 }
 
 
@@ -247,13 +236,10 @@ def infer_requirement_level(
     difficulty_level: str,
 ) -> str:
     lowered = normalize_title(f"{title} {content}")
-    normalized_title = normalize_title(title)
     if category == "common":
         return "excluded"
     if category == "basic":
         return "required"
-    if normalized_title in KNOWN_CHALLENGE_NORMALIZED_TITLES:
-        return "optional"
     if track_type == "extra" or "선택" in lowered:
         return "optional"
     if difficulty_level == "high":
@@ -264,8 +250,8 @@ def infer_requirement_level(
 def infer_difficulty_level(title: str, content: str) -> str:
     lowered = normalize_title(f"{title} {content}")
     normalized_title = normalize_title(title)
-    if normalized_title in KNOWN_DIFFICULTY_OVERRIDES:
-        return KNOWN_DIFFICULTY_OVERRIDES[normalized_title]
+    if normalized_title in KNOWN_HIGH_DIFFICULTY_NORMALIZED_TITLES:
+        return "high"
     if "최하" in lowered or re.search(r"(^|[\s\-_[(])하($|[\s\-_)\]])", lowered):
         return "low"
     if "중" in lowered or re.search(r"(^|[\s\-_[(])중($|[\s\-_)\]])", lowered):

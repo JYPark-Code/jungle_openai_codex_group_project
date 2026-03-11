@@ -393,3 +393,49 @@ def test_closed_challenge_issue_is_shown_as_done_not_challenge(app, monkeypatch)
 
     assert 23 in done_issue_numbers
     assert 23 not in challenge_issue_numbers
+
+
+def test_orphan_closed_issue_is_shown_as_done_in_issue_board(app):
+    with app.app_context():
+        user_id = upsert_user("5008", "orphan-closed-user", "orphan closed user")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="781",
+            default_branch="main",
+        )
+        commit_id, _ = save_commit(
+            repository_id=repository_id,
+            sha="orphan-closed-123",
+            message="recover orphan closed issue",
+            author_name="tester",
+            committed_at="2026-03-11T12:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="524",
+            issue_number=23,
+            title="[WEEK2] 臾몄옄??- IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=None,
+            problem_key="?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            file_path="week2/problem-solving/?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            judgement_status="attempted",
+            match_score=0.0,
+        )
+
+        board = build_issue_board({"id": repository_id, "full_name": "JYPark-Code/SW-AI-W02-05"})
+
+    done_issue_numbers = {item["issue_number"] for item in board["columns"]["done"]}
+    in_progress_issue_numbers = {item["issue_number"] for item in board["columns"]["in_progress"]}
+
+    assert 23 in done_issue_numbers
+    assert 23 not in in_progress_issue_numbers

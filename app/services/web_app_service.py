@@ -14,10 +14,12 @@ from app.services.commit_judge_service import (
     get_commit_detail,
     get_commit_judge_result,
     list_repository_commits,
+    match_issue_by_filename,
 )
 from app.services.github_service import fetch_commit_changed_files, fetch_file_content_at_ref
 from app.services.issue_template_service import build_template_status, is_challenge_issue, is_common_issue
 from app.services.recommendation_service import generate_recommendations
+from app.services.reporting_judgement_service import collapse_judgements_for_reporting
 from app.services.report_service import build_user_report
 from app.utils.errors import ApiError
 
@@ -49,10 +51,19 @@ ACTIVITY_SORT_OPTIONS = {
 def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc") -> dict:
     report = build_user_report(repository["id"], report_scope="dashboard_page")
     recommendations = report["recommendations"]
-    if not recommendations and report["weak_topics"]:
+    desired_recommendation_count = min(2, len(report["weak_topics"]))
+    if len(recommendations) < desired_recommendation_count and report["weak_topics"]:
         generated = generate_recommendations(repository["id"])
-        recommendations = generated["recommendations"]
+        if generated["recommendations"]:
+            recommendations = report["recommendations"] + generated["recommendations"]
+        else:
+            recommendations = report["recommendations"]
         report["weak_topics"] = generated["weak_topics"]
+    recommendations = _select_recommendations_for_topics(
+        recommendations,
+        report["weak_topics"],
+        desired_recommendation_count,
+    )
 
     issue_board = build_issue_board(repository, activity_sort=activity_sort)
     template_status = build_template_status(repository["id"])
@@ -84,11 +95,15 @@ def build_dashboard_page_data(repository: dict, activity_sort: str = "issue_asc"
 
 def build_issue_board(repository: dict, activity_sort: str = "issue_asc") -> dict:
     issues = get_issues_by_repository_id(repository["id"])
-    judgements = list_problem_judgements_by_repository_id(repository["id"])
+    collapsed, _extras = collapse_judgements_for_reporting(
+        list_problem_judgements_by_repository_id(repository["id"]),
+        issues,
+        match_issue_by_filename,
+    )
     template_status = build_template_status(repository["id"])
     issue_meta_map = _build_issue_meta_map(template_status)
-    challenge_issue_numbers = _build_challenge_issue_numbers(judgements)
-    best_status_by_issue = _build_issue_status_map(judgements)
+    challenge_issue_numbers = _build_challenge_issue_numbers(collapsed)
+    best_status_by_issue = _build_issue_status_map(collapsed)
 
     current_week_key = template_status.get("active_week") or _pick_current_week_key(issues)
     current_week_issues = []
@@ -438,3 +453,40 @@ def _sort_issue_activity(items: list[dict], activity_sort: str) -> None:
         )
         return
     items.sort(key=lambda item: (item["issue_number"] or 0, item["title"]))
+
+
+def _select_recommendations_for_topics(
+    recommendations: list[dict],
+    weak_topics: list[str],
+    limit: int,
+) -> list[dict]:
+    if not limit:
+        return []
+
+    selected = []
+    used_urls = set()
+    topic_buckets = {}
+    for item in recommendations:
+        topic_buckets.setdefault(item.get("topic"), []).append(item)
+
+    for topic in weak_topics:
+        for item in topic_buckets.get(topic, []):
+            url = item.get("url")
+            if url in used_urls:
+                continue
+            selected.append(item)
+            used_urls.add(url)
+            break
+        if len(selected) >= limit:
+            return selected
+
+    for item in recommendations:
+        url = item.get("url")
+        if url in used_urls:
+            continue
+        selected.append(item)
+        used_urls.add(url)
+        if len(selected) >= limit:
+            break
+
+    return selected

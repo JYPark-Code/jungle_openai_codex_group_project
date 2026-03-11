@@ -51,6 +51,12 @@ def test_category_matching_works():
     assert "BFS" in categories
 
 
+def test_category_matching_handles_week2_problem_names():
+    assert "재귀" in match_categories_from_text("[WEEK2] 재귀함수 - 하노이 탑")
+    assert "문자열" in match_categories_from_text("[WEEK2] 문자열 - IPv6")
+    assert "DFS" in match_categories_from_text("[WEEK2] 백트래킹 - N-Queen")
+
+
 def test_reverse_taxonomy_mapping():
     reverse_mapping = build_reverse_taxonomy()
 
@@ -162,6 +168,37 @@ def test_skill_map_uses_best_status_per_issue(app):
     active_domains = [item for item in skill_map["domains"] if item["total"] > 0]
     assert any(item["possibly_solved"] >= 1 for item in active_domains)
     assert all(item["total"] == item["solved"] + item["possibly_solved"] + item["attempted"] for item in active_domains)
+
+
+def test_skill_map_recovers_closed_issue_from_orphan_judgement(app):
+    repository_id, commit_id = ensure_review_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="103",
+            issue_number=23,
+            title="[WEEK2] 臾몄옄??- IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=None,
+            problem_key="?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            file_path="week2/problem-solving/?쒖씠?꾩쨷_臾몄옄??IPv6_怨⑤뱶5.py",
+            judgement_status="attempted",
+            match_score=0.0,
+        )
+
+        skill_map = build_skill_map(repository_id)
+
+    string_domains = [item for item in skill_map["domains"] if item["total"] > 0]
+    assert any(item["solved"] >= 1 for item in string_domains)
+    assert skill_map["summary"]["attempted_count"] == 0
+    assert skill_map["summary"]["solved_count"] == 1
 
 
 def test_commit_review_generation(client, app, monkeypatch):

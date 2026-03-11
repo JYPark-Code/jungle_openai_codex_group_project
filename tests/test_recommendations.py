@@ -250,3 +250,129 @@ def test_rank_weak_topics_collapses_duplicate_issue_judgements(app):
     assert impl_topic["total"] == 1
     assert impl_topic["solved"] == 0
     assert impl_topic["solved_ratio"] == 0.0
+
+
+def test_rank_weak_topics_recovers_closed_issue_from_orphan_judgement(app):
+    with app.app_context():
+        user_id = upsert_user("8010", "recommend-user-orphan", "orphan test")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05-orphan",
+            full_name="JYPark-Code/SW-AI-W02-05-orphan",
+            github_repo_id="667",
+            default_branch="main",
+        )
+        commit_id, _ = save_commit(
+            repository_id=repository_id,
+            sha="recommend-orphan",
+            message="recover orphan judgement",
+            author_name="JYPark",
+            committed_at="2026-03-11T12:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="closed-ipv6",
+            issue_number=23,
+            title="[WEEK2] 문자열 - IPv6",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=None,
+            problem_key="난이도중_문자열_IPv6_골드5.py",
+            file_path="week2/problem-solving/난이도중_문자열_IPv6_골드5.py",
+            judgement_status="attempted",
+            match_score=0.0,
+        )
+
+        ranking = rank_weak_topics(repository_id, limit=10)
+
+    assert not any(item["topic"] == "문자열" and item["total"] > 0 for item in ranking)
+
+
+def test_rank_weak_topics_excludes_recent_only_topics_without_problem_data(app):
+    repository_id, commit_id = ensure_recommendation_context(app)
+
+    with app.app_context():
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=1,
+            problem_key="[WEEK2] 구현 - 예시",
+            file_path="week2/basic/구현_예시.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+
+        ranking = rank_weak_topics(repository_id, limit=10)
+
+    assert all(item["total"] > 0 for item in ranking)
+
+
+def test_get_recommendations_filters_out_stale_topics(app):
+    repository_id, commit_id = ensure_recommendation_context(app)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="closed-math",
+            issue_number=22,
+            title="[WEEK2] 정수론 - 소수 찾기",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="open-impl",
+            issue_number=17,
+            title="[WEEK2] 파이썬 문법 - 최댓값",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T12:00:00Z",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=22,
+            problem_key="[WEEK2] 정수론 - 소수 찾기",
+            file_path="week2/problem-solving/정수론_소수찾기.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=17,
+            problem_key="[WEEK2] 파이썬 문법 - 최댓값",
+            file_path="week2/basic/파이썬문법_최댓값.py",
+            judgement_status="attempted",
+            match_score=0.4,
+        )
+
+        from app.models.db import save_recommendation
+
+        save_recommendation(
+            repository_id=repository_id,
+            topic="DFS",
+            problem_title="타겟 넘버",
+            problem_url="https://school.programmers.co.kr/learn/courses/30/lessons/43165",
+            source_site="programmers",
+            reason="stale",
+        )
+        save_recommendation(
+            repository_id=repository_id,
+            topic="수학",
+            problem_title="소수 찾기",
+            problem_url="https://www.acmicpc.net/problem/1978",
+            source_site="baekjoon",
+            reason="active",
+        )
+
+        data = get_recommendations(repository_id)
+
+    assert all(item["topic"] in data["weak_topics"] for item in data["recommendations"])

@@ -7,13 +7,14 @@ from app.models.db import (
     get_commit_by_sha,
     get_issues_by_repository_id,
     get_problem_judgements_by_commit_id,
-    get_problem_summary_by_repository_id,
+    list_problem_judgements_by_repository_id,
     now_iso,
     save_commit,
     save_problem_judgement,
     update_commit_files,
 )
 from app.services.github_service import fetch_commit_changed_files
+from app.services.reporting_judgement_service import collapse_judgements_for_reporting, summarize_judgement_statuses
 from app.utils.errors import ApiError
 
 
@@ -166,20 +167,46 @@ def get_commit_judge_result(repository_id: int, sha: str) -> dict:
 
 
 def get_repository_problem_summary(repository_id: int) -> dict:
-    return get_problem_summary_by_repository_id(repository_id)
+    issues = get_issues_by_repository_id(repository_id)
+    collapsed, extras = collapse_judgements_for_reporting(
+        list_problem_judgements_by_repository_id(repository_id),
+        issues,
+        match_issue_by_filename,
+    )
+    return summarize_judgement_statuses(collapsed + extras)
 
 
 def normalize_problem_filename(file_path: str) -> str:
     stem = Path(file_path).stem
-    stem = re.sub(r"^(연습문제|난이도상|난이도중|난이도하|extra|basic|common)[_\-\s]+", "", stem, flags=re.IGNORECASE)
-    stem = re.sub(r"^문제[_\-\s]+", "", stem, flags=re.IGNORECASE)
-    stem = re.sub(
-        r"[_\-\s]+(브론즈\d*|실버\d*|골드\d*|플래\d*|플래티넘\d*|리트코드|leetcode|\d+)$",
-        "",
-        stem,
-        flags=re.IGNORECASE,
-    )
-    normalized = re.sub(r"[_\-]+", " ", stem)
+    raw_tokens = [token for token in re.split(r"[_\-\s]+", stem) if token]
+    cleaned_tokens = []
+
+    for index, token in enumerate(raw_tokens):
+        lowered = token.casefold()
+        if index == 0 and (
+            lowered.startswith("week")
+            or lowered.startswith("basic")
+            or lowered.startswith("common")
+            or lowered.startswith("extra")
+            or "난이도" in token
+            or "연습문제" in token
+        ):
+            continue
+        if lowered == "문제":
+            continue
+
+        token = re.sub(
+            r"(백준|leetcode|리트코드|브론즈|실버|골드|플래|플래티넘)\d*$",
+            "",
+            token,
+            flags=re.IGNORECASE,
+        )
+        token = re.sub(r"^\d+|\d+$", "", token)
+        token = token.strip()
+        if token:
+            cleaned_tokens.append(token)
+
+    normalized = " ".join(cleaned_tokens)
     normalized = re.sub(r"\s+", " ", normalized).strip().casefold()
     return normalized
 
@@ -195,6 +222,7 @@ def normalize_issue_title(title: str) -> str:
 def match_issue_by_filename(file_path: str, issues: list[dict]) -> dict:
     normalized_filename = normalize_problem_filename(file_path)
     filename_tokens = set(_tokenize_for_matching(normalized_filename))
+    compact_filename = _compact_for_matching(normalized_filename)
 
     best_issue = None
     best_score = 0.0
@@ -203,6 +231,7 @@ def match_issue_by_filename(file_path: str, issues: list[dict]) -> dict:
     for issue in issues:
         normalized_title = normalize_issue_title(issue["title"])
         title_tokens = set(_tokenize_for_matching(normalized_title))
+        compact_title = _compact_for_matching(normalized_title)
         if not title_tokens:
             continue
 
@@ -214,9 +243,11 @@ def match_issue_by_filename(file_path: str, issues: list[dict]) -> dict:
             if token not in GENERIC_MATCH_TOKENS
         }
 
-        if normalized_filename == normalized_title:
+        if compact_filename and compact_filename == compact_title:
             score = 1.0
-        elif normalized_filename in normalized_title or normalized_title in normalized_filename:
+        elif compact_filename and compact_title and (
+            compact_filename in compact_title or compact_title in compact_filename
+        ):
             score = max(score, 0.85)
         elif not meaningful_overlap:
             score = min(score, 0.15)
@@ -276,6 +307,10 @@ def summarize_judgements(judgements: list[dict]) -> dict:
 
 
 def _tokenize_for_matching(value: str) -> list[str]:
-    normalized = re.sub(r"[\(\)\[\],]+", " ", value)
+    normalized = re.sub(r"[^0-9A-Za-z가-힣]+", " ", value)
     normalized = re.sub(r"\s+", " ", normalized).strip()
-    return [token for token in normalized.split(" ") if token]
+    return [_compact_for_matching(token) for token in normalized.split(" ") if _compact_for_matching(token)]
+
+
+def _compact_for_matching(value: str) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]+", "", value).casefold()

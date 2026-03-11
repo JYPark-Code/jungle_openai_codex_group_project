@@ -1,0 +1,323 @@
+{% extends "web_app_base.html" %}
+
+{% block title %}대시보드{% endblock %}
+
+{% block head %}
+  <style>
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .summary-card {
+      padding: 22px;
+    }
+    .summary-card strong {
+      display: block;
+      margin-top: 10px;
+      color: var(--text-strong);
+      font-size: 2.2rem;
+      letter-spacing: -0.05em;
+    }
+    .dashboard-hero {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .activity-status {
+      min-width: 104px;
+      justify-content: center;
+    }
+    .issue-link {
+      color: var(--text-strong);
+      font-weight: 600;
+    }
+    .issue-buckets {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .recommendation-grid {
+      display: grid;
+      gap: 16px;
+    }
+    .recommendation-card {
+      padding: 18px;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .activity-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .activity-sort {
+      min-width: 180px;
+      min-height: 40px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text-base);
+    }
+    @media (max-width: 1100px) {
+      .dashboard-hero,
+      .issue-buckets,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="topbar">
+    <div class="title-block">
+      <h1>대시보드</h1>
+      <p>현재 저장소 기준으로 문제 진척도, 이번 주 활동, 추천 문제를 확인합니다.</p>
+    </div>
+    {% if current_repository and dashboard %}
+      <div class="chip">마지막 동기화 {{ dashboard.formatted_last_synced_at }}</div>
+    {% endif %}
+  </div>
+
+  {% if not current_repository %}
+    <section class="grid" style="grid-template-columns: 1fr 1fr;">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">저장소 선택</h2>
+            <p class="panel-copy">로그인 후 분석할 GitHub 저장소를 먼저 선택해야 합니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if repositories %}
+            <div class="grid">
+              {% for repository in repositories[:8] %}
+                <form method="post" action="/app/repositories/select" class="panel" style="padding: 18px;">
+                  <input type="hidden" name="owner" value="{{ repository.owner }}">
+                  <input type="hidden" name="name" value="{{ repository.name }}">
+                  <input type="hidden" name="full_name" value="{{ repository.full_name }}">
+                  <input type="hidden" name="github_repo_id" value="{{ repository.github_repo_id }}">
+                  <input type="hidden" name="default_branch" value="{{ repository.default_branch }}">
+                  <strong>{{ repository.full_name }}</strong>
+                  <p class="muted">{{ repository.default_branch }}</p>
+                  <button class="button primary" type="submit">이 저장소 선택</button>
+                </form>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">선택 가능한 저장소를 아직 불러오지 못했습니다. OAuth 토큰과 GitHub 연결 상태를 확인하세요.</div>
+          {% endif %}
+        </div>
+      </article>
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">다음 단계</h2>
+            <p class="panel-copy">저장소 선택 후 동기화를 실행하면 이슈와 커밋이 로컬 DB로 들어옵니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="empty-state">저장소 선택 UI는 이미 백엔드와 연결되어 있습니다. 왼쪽 저장소 목록을 눌러 바로 전환할 수 있습니다.</div>
+        </div>
+      </article>
+    </section>
+  {% else %}
+    <section class="dashboard-hero">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">템플릿 이슈 상태</h2>
+            <p class="panel-copy">{{ dashboard.template_status.active_week or "현재 주차" }} 기준 연결 현황입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="meta-row">
+            <div class="chip">현재 주차 {{ dashboard.template_status.active_week_template_count }}</div>
+            <div class="chip">현재 주차 연결 {{ dashboard.template_status.matched_issues|length }}</div>
+            <div class="chip">필수 연결 {{ dashboard.template_status.required_matched_count }}/{{ dashboard.template_status.required_template_count }}</div>
+            <div class="chip">전체 연결 {{ dashboard.template_status.matched_count }}/{{ dashboard.template_status.template_count }}</div>
+          </div>
+          <p class="muted" style="margin: 14px 0 0;">{{ dashboard.template_status.status_note }}</p>
+          <div style="margin-top: 16px;">
+            <form method="post" action="/app/issues/create-missing">
+              <button class="button primary" type="submit" {% if dashboard.template_status.missing_issues|length == 0 %}disabled{% endif %}>
+                누락 이슈 생성
+              </button>
+            </form>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">현재 상태</h2>
+            <p class="panel-copy">주차 진행률과 약점 상태를 현재 저장소 기준으로 계산합니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="meta-row">
+            <div class="chip">주차 진행률 {{ (dashboard.report.week_progress * 100)|round|int }}%</div>
+            <div class="badge status-{{ dashboard.report.status|lower }}">종합 상태 {{ dashboard.report.status }}</div>
+            <div class="chip">필수 연결 {{ dashboard.report.required_matched_count }}/{{ dashboard.report.required_template_count }}</div>
+          </div>
+          <p class="muted" style="margin-top: 14px;">{{ dashboard.report.ai_summary }}</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="summary-grid">
+      {% for card in dashboard.progress_cards %}
+        <article class="panel summary-card">
+          <p class="muted" style="margin: 0;">{{ card.label }}</p>
+          <strong>{{ card.value }}</strong>
+        </article>
+      {% endfor %}
+    </section>
+
+    <section class="grid" style="grid-template-columns: 1.35fr 0.9fr; margin-top: 20px;">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">이번 주 활동</h2>
+            <p class="panel-copy">{{ dashboard.issue_board.week_label }} 기준 이슈 번호 순서입니다.</p>
+          </div>
+          <form method="post" action="/app/repositories/sync">
+            <button class="button primary" type="submit">저장소 동기화</button>
+          </form>
+        </div>
+        <div class="panel-body">
+          {% if dashboard.issue_board.activity %}
+            <div class="activity-toolbar">
+              <form method="get" action="/app/dashboard">
+                <select class="activity-sort" name="activity_sort" onchange="this.form.submit()">
+                  {% for value, label in dashboard.activity_sort_options.items() %}
+                    <option value="{{ value }}" {% if dashboard.activity_sort == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>이슈</th>
+                  <th>문제</th>
+                  <th>상태</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in dashboard.issue_board.activity %}
+                  <tr>
+                    <td>#{{ item.issue_number }}</td>
+                    <td><a class="issue-link" href="{{ item.issue_url }}" target="_blank" rel="noreferrer">{{ item.title }}</a></td>
+                    <td>
+                      <span class="badge activity-status status-{{ item.status_key }}">{{ item.status_label }}</span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="empty-state">현재 주차로 분류된 이슈가 없습니다. 이슈 제목에 `week2`, `3주차` 같은 키가 있으면 더 정확히 묶입니다.</div>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">AI 추천 문제</h2>
+            <p class="panel-copy">약점 영역 기준 외부 문제 링크입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if dashboard.recommendations %}
+            <div class="recommendation-grid">
+              {% for item in dashboard.recommendations %}
+                <article class="panel recommendation-card">
+                  <strong>{{ item.title }}</strong>
+                  <p class="muted">{{ item.topic }} · {{ item.source }}</p>
+                  <p class="muted">{{ item.reason }}</p>
+                  <a class="button primary" href="{{ item.url }}" target="_blank" rel="noreferrer">문제 보러가기</a>
+                </article>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">추천 문제를 만들 데이터가 아직 부족합니다. 저장소 동기화 후 커밋 판정이 먼저 필요합니다.</div>
+          {% endif %}
+        </div>
+      </article>
+    </section>
+
+    <section class="issue-buckets">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">이번 주차 풀어야 하는 문제</h2>
+            <p class="panel-copy">아직 시작하지 않은 이슈입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if dashboard.issue_board.columns.todo %}
+            <div class="grid">
+              {% for item in dashboard.issue_board.columns.todo %}
+                <a class="chip" href="{{ item.issue_url }}" target="_blank" rel="noreferrer">#{{ item.issue_number }} {{ item.title }}</a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">남은 문제가 없습니다.</div>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">풀고 있는 문제</h2>
+            <p class="panel-copy">시도 중이거나 거의 해결된 문제입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if dashboard.issue_board.columns.in_progress %}
+            <div class="grid">
+              {% for item in dashboard.issue_board.columns.in_progress %}
+                <a class="chip" href="{{ item.issue_url }}" target="_blank" rel="noreferrer">#{{ item.issue_number }} {{ item.title }}</a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">진행 중인 문제가 없습니다.</div>
+          {% endif %}
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">푼 문제</h2>
+            <p class="panel-copy">판정 또는 이슈 상태 기준으로 완료된 문제입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if dashboard.issue_board.columns.done %}
+            <div class="grid">
+              {% for item in dashboard.issue_board.columns.done %}
+                <a class="chip" href="{{ item.issue_url }}" target="_blank" rel="noreferrer">#{{ item.issue_number }} {{ item.title }}</a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state">완료 판정된 문제가 없습니다.</div>
+          {% endif %}
+        </div>
+      </article>
+    </section>
+  {% endif %}
+{% endblock %}

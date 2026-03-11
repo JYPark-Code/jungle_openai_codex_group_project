@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}정글24{% endblock %}</title>
+    <style>
+      :root {
+        --bg: #f4f4f5;
+        --surface: #ffffff;
+        --surface-soft: #f8f8f8;
+        --surface-muted: #f1f3f7;
+        --sidebar: #050505;
+        --line: rgba(17, 24, 39, 0.08);
+        --line-strong: rgba(17, 24, 39, 0.16);
+        --text-strong: #111111;
+        --text-base: #2a2a2c;
+        --text-muted: #6a6b70;
+        --text-soft: #8d8f96;
+        --text-on-dark: #f5f7fb;
+        --accent-primary: #2453ff;
+        --accent-primary-soft: #edf2ff;
+        --accent-success: #17a34a;
+        --accent-success-soft: #edf9f0;
+        --accent-warn: #d97706;
+        --accent-warn-soft: #fff5e8;
+        --accent-danger: #dc2626;
+        --accent-danger-soft: #fff0f0;
+      }
+
+      * { box-sizing: border-box; }
+      html { background: var(--bg); }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text-base);
+        font-family: Pretendard, "Apple SD Gothic Neo", "Avenir Next", sans-serif;
+      }
+      a { color: inherit; text-decoration: none; }
+      button, select { font: inherit; }
+
+      .page {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: 220px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        height: 100vh;
+        padding: 28px 18px 16px;
+        background: var(--sidebar);
+        overflow-x: hidden;
+      }
+      .brand {
+        color: var(--text-on-dark);
+        font-size: 1.45rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+      .brand span { color: var(--accent-primary); }
+      .user-card {
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.04);
+      }
+      .user-card strong,
+      .user-card span {
+        display: block;
+      }
+      .user-card strong {
+        color: var(--text-on-dark);
+        font-size: 0.95rem;
+      }
+      .user-card span {
+        margin-top: 6px;
+        color: rgba(245,247,251,0.66);
+        font-size: 0.78rem;
+        line-height: 1.45;
+      }
+      .sidebar-section {
+        display: grid;
+        gap: 10px;
+      }
+      .sidebar-section.repositories {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .nav-title {
+        margin: 0;
+        color: rgba(245,247,251,0.42);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+      .nav a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        color: rgba(245,247,251,0.8);
+        font-size: 0.92rem;
+        font-weight: 500;
+      }
+      .nav a.active {
+        background: var(--accent-primary);
+        color: #fff;
+      }
+      .nav a::before {
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        content: "";
+        opacity: 0.9;
+      }
+      .repo-list {
+        display: grid;
+        gap: 4px;
+        align-content: start;
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 4px;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,0.3) transparent;
+        background: transparent;
+      }
+      .repo-list::-webkit-scrollbar {
+        width: 10px;
+        background: transparent;
+        -webkit-appearance: none;
+      }
+      .repo-list::-webkit-scrollbar-track {
+        background: transparent !important;
+        box-shadow: none;
+      }
+      .repo-list::-webkit-scrollbar-thumb {
+        border: 3px solid transparent;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.28);
+        background-clip: padding-box;
+      }
+      .repo-list::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.42);
+        background-clip: padding-box;
+      }
+      .repo-list::-webkit-scrollbar-corner,
+      .repo-list::-webkit-scrollbar-track-piece,
+      .repo-list::-webkit-scrollbar-button {
+        background: transparent !important;
+      }
+      .repo-form {
+        display: block;
+        margin: 0;
+      }
+      .repo-button {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: rgba(255,255,255,0.03);
+        color: rgba(245,247,251,0.78);
+        text-align: left;
+        cursor: pointer;
+      }
+      .repo-button.active {
+        border-color: rgba(36, 83, 255, 0.4);
+        background: rgba(36, 83, 255, 0.18);
+        color: #fff;
+      }
+      .repo-button strong,
+      .repo-button span {
+        display: block;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      .repo-button strong {
+        font-size: 0.77rem;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      .repo-button span {
+        margin-top: 2px;
+        font-size: 0.69rem;
+        color: inherit;
+        opacity: 0.72;
+        line-height: 1.25;
+      }
+      .sidebar-bottom {
+        position: sticky;
+        bottom: 0;
+        margin-top: auto;
+        padding-top: 12px;
+        background: linear-gradient(180deg, rgba(5,5,5,0) 0%, rgba(5,5,5,1) 28%);
+      }
+      .logout-form button {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid rgba(255,255,255,0.12);
+        background: transparent;
+        color: rgba(245,247,251,0.9);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .content {
+        padding: 28px 30px 36px;
+        background: var(--surface-soft);
+        border-left: 1px solid var(--line);
+      }
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 22px;
+      }
+      .title-block h1 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 2rem;
+        letter-spacing: -0.04em;
+      }
+      .title-block p {
+        margin: 10px 0 0;
+        color: var(--text-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      .grid {
+        display: grid;
+        gap: 20px;
+      }
+      .panel {
+        border: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .panel-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 22px 22px 0;
+      }
+      .panel-title {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 1.1rem;
+        letter-spacing: -0.03em;
+      }
+      .panel-copy {
+        margin: 8px 0 0;
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        line-height: 1.5;
+      }
+      .panel-body {
+        padding: 22px;
+      }
+      .chip,
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        line-height: 1.2;
+      }
+      .badge {
+        font-weight: 700;
+      }
+      .badge.status-good {
+        border-color: rgba(23, 163, 74, 0.18);
+        background: var(--accent-success-soft);
+        color: var(--accent-success);
+      }
+      .badge.status-watch,
+      .badge.status-attempted,
+      .badge.status-possibly_solved {
+        border-color: rgba(217, 119, 6, 0.18);
+        background: var(--accent-warn-soft);
+        color: var(--accent-warn);
+      }
+      .badge.status-risk,
+      .badge.status-not_started {
+        border-color: rgba(220, 38, 38, 0.16);
+        background: var(--accent-danger-soft);
+        color: var(--accent-danger);
+      }
+      .badge.status-solved {
+        border-color: rgba(23, 163, 74, 0.18);
+        background: var(--accent-success-soft);
+        color: var(--accent-success);
+      }
+      .button,
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 10px 14px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text-base);
+        cursor: pointer;
+        font-size: 0.84rem;
+        font-weight: 700;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      .button.primary {
+        border-color: rgba(36, 83, 255, 0.14);
+        background: var(--accent-primary-soft);
+        color: var(--accent-primary);
+      }
+      .button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .muted {
+        color: var(--text-muted);
+      }
+      .empty-state {
+        padding: 26px;
+        border: 1px dashed var(--line-strong);
+        background: rgba(255,255,255,0.56);
+        color: var(--text-muted);
+        line-height: 1.7;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 14px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-size: 0.84rem;
+        vertical-align: top;
+      }
+      th {
+        color: var(--text-soft);
+        font-weight: 700;
+      }
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        padding: 16px;
+        border: 1px solid var(--line);
+        background: #101114;
+        color: #f5f7fb;
+        font-size: 0.78rem;
+        line-height: 1.6;
+      }
+      .toast-stack {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 40;
+        display: grid;
+        gap: 10px;
+        width: min(360px, calc(100vw - 32px));
+      }
+      .toast {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--text-base);
+        box-shadow: 0 12px 28px rgba(17, 24, 39, 0.1);
+      }
+      .toast.success {
+        border-color: rgba(23, 163, 74, 0.18);
+        background: var(--accent-success-soft);
+      }
+      .toast.error {
+        border-color: rgba(220, 38, 38, 0.16);
+        background: var(--accent-danger-soft);
+      }
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: none;
+        place-items: center;
+        background: rgba(244, 244, 245, 0.72);
+        backdrop-filter: blur(2px);
+      }
+      .loading-overlay.active {
+        display: grid;
+      }
+      .loading-card {
+        display: grid;
+        gap: 14px;
+        width: min(360px, calc(100vw - 40px));
+        padding: 24px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .loading-title {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .loading-copy {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+      }
+      .loading-bar {
+        position: relative;
+        height: 4px;
+        overflow: hidden;
+        background: var(--surface-muted);
+      }
+      .loading-bar::after {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 42%;
+        background: var(--accent-primary);
+        animation: loading-slide 1s ease-in-out infinite;
+        content: "";
+      }
+      @keyframes loading-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(260%); }
+      }
+
+      @media (max-width: 1180px) {
+        .shell {
+          grid-template-columns: 196px minmax(0, 1fr);
+        }
+        .content {
+          padding: 22px 22px 30px;
+        }
+      }
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          position: static;
+          height: auto;
+        }
+        .sidebar-bottom {
+          position: static;
+          background: transparent;
+        }
+        .content {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+        }
+      }
+    </style>
+    {% block head %}{% endblock %}
+  </head>
+  <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="toast-stack">
+          {% for category, message in messages %}
+            <div class="toast {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <div class="loading-overlay" id="global-loading">
+      <div class="loading-card" role="status" aria-live="polite">
+        <p class="loading-title">작업을 처리하고 있습니다</p>
+        <p class="loading-copy">동기화나 화면 전환이 끝날 때까지 잠시만 기다려주세요.</p>
+        <div class="loading-bar"></div>
+      </div>
+    </div>
+
+    <main class="page">
+      <section class="shell">
+        <aside class="sidebar">
+          <div class="brand">정글24<span>.</span></div>
+          <div class="user-card">
+            <strong>{{ current_user.github_name or current_user.github_login }}</strong>
+            <span>{{ current_user.github_login }}</span>
+            {% if current_repository %}
+              <span>{{ current_repository.full_name }}</span>
+            {% endif %}
+          </div>
+
+          <div class="sidebar-section">
+            <p class="nav-title">메뉴</p>
+            <nav class="nav">
+              <a class="{% if screen == 'dashboard' %}active{% endif %}" href="/app/dashboard">대시보드</a>
+              <a class="{% if screen == 'reviews' %}active{% endif %}" href="/app/reviews">커밋 리뷰</a>
+              <a class="{% if screen == 'profile' %}active{% endif %}" href="/app/profile">마이페이지</a>
+            </nav>
+          </div>
+
+          {% if repositories %}
+            <div class="sidebar-section repositories">
+              <p class="nav-title">저장소</p>
+              <div class="repo-list">
+                {% for repository in repositories[:6] %}
+                  <form class="repo-form" method="post" action="/app/repositories/select">
+                    <input type="hidden" name="owner" value="{{ repository.owner }}">
+                    <input type="hidden" name="name" value="{{ repository.name }}">
+                    <input type="hidden" name="full_name" value="{{ repository.full_name }}">
+                    <input type="hidden" name="github_repo_id" value="{{ repository.github_repo_id }}">
+                    <input type="hidden" name="default_branch" value="{{ repository.default_branch }}">
+                    <button
+                      class="repo-button {% if current_repository and current_repository.full_name == repository.full_name %}active{% endif %}"
+                      type="submit"
+                    >
+                      <strong>{{ repository.full_name }}</strong>
+                      <span>{{ repository.default_branch or "기본 브랜치 없음" }}</span>
+                    </button>
+                  </form>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="sidebar-bottom">
+            <form class="logout-form" method="post" action="/auth/logout">
+              <button type="submit">로그아웃</button>
+            </form>
+          </div>
+        </aside>
+
+        <section class="content">
+          {% block content %}{% endblock %}
+        </section>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const overlay = document.getElementById("global-loading");
+        if (!overlay) return;
+
+        const showLoading = () => overlay.classList.add("active");
+        const hideLoading = () => overlay.classList.remove("active");
+
+        document.querySelectorAll("form").forEach((form) => {
+          form.addEventListener("submit", () => {
+            if (!form.hasAttribute("data-skip-loading")) {
+              showLoading();
+            }
+          });
+        });
+
+        document.querySelectorAll("a[href]").forEach((anchor) => {
+          anchor.addEventListener("click", (event) => {
+            const href = anchor.getAttribute("href") || "";
+            if (!href || href.startsWith("#")) return;
+            if (anchor.target === "_blank") return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            if (/^https?:\/\//.test(href) && !href.startsWith(window.location.origin)) return;
+            showLoading();
+          });
+        });
+
+        window.addEventListener("pageshow", hideLoading);
+        window.addEventListener("load", hideLoading);
+
+        setTimeout(() => {
+          document.querySelectorAll(".toast").forEach((toast) => {
+            toast.style.transition = "opacity 0.2s ease";
+            toast.style.opacity = "0";
+            setTimeout(() => toast.remove(), 220);
+          });
+        }, 2200);
+      })();
+    </script>
+  </body>
+</html>

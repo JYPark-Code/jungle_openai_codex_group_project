@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from app.models.db import (
     get_active_github_project,
     get_latest_analysis_report,
+    get_issues_by_repository_id,
     get_repository_by_id,
     get_sync_status,
     list_problem_judgements_by_repository_id,
@@ -65,6 +68,8 @@ def build_user_report(repository_id: int, report_scope: str = "mypage_report") -
         "attempted_count": attempted_count,
         "possibly_solved_count": possibly_solved_count,
         "extra_practice_count": extra_practice_count,
+        "total_issue_count": tracked_summary["total_issue_count"],
+        "remaining_issue_count": tracked_summary["remaining_issue_count"],
         "week_progress": round(week_progress, 2),
         "required_template_count": template_status.get("required_template_count", 0),
         "required_matched_count": template_status.get("required_matched_count", 0),
@@ -96,18 +101,36 @@ def get_cached_report(repository_id: int, report_scope: str) -> dict | None:
 
 
 def build_tracked_problem_summary(repository_id: int) -> dict:
+    issues = get_issues_by_repository_id(repository_id)
     judgements = list_problem_judgements_by_repository_id(repository_id)
     tracked = [item for item in judgements if item.get("issue_number") is not None]
     extra = [item for item in judgements if item.get("issue_number") is None]
+
+    best_status_by_issue = {}
+    priority = {"not_started": 0, "attempted": 1, "possibly_solved": 2, "solved": 3}
+    for item in tracked:
+        issue_number = item.get("issue_number")
+        if issue_number is None:
+            continue
+        status = item["judgement_status"]
+        current = best_status_by_issue.get(issue_number)
+        if current is None or priority.get(status, -1) > priority.get(current, -1):
+            best_status_by_issue[issue_number] = status
 
     summary = {
         "solved_count": 0,
         "attempted_count": 0,
         "possibly_solved_count": 0,
         "extra_practice_count": len(extra),
+        "total_issue_count": len(issues),
+        "remaining_issue_count": 0,
     }
-    for item in tracked:
-        status = item["judgement_status"]
+
+    for issue in issues:
+        status = best_status_by_issue.get(issue["issue_number"])
+        if not status and issue["state"] == "closed":
+            status = "solved"
+
         if status == "solved":
             summary["solved_count"] += 1
         elif status == "possibly_solved":
@@ -115,6 +138,9 @@ def build_tracked_problem_summary(repository_id: int) -> dict:
             summary["attempted_count"] += 1
         elif status == "attempted":
             summary["attempted_count"] += 1
+        else:
+            summary["remaining_issue_count"] += 1
+
     return summary
 
 

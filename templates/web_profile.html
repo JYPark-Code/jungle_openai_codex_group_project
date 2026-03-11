@@ -1,0 +1,234 @@
+{% extends "web_app_base.html" %}
+
+{% block title %}마이페이지{% endblock %}
+
+{% block head %}
+  <style>
+    .profile-grid {
+      display: grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 20px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .stat-card {
+      padding: 22px;
+    }
+    .stat-card strong {
+      display: block;
+      color: var(--text-strong);
+      font-size: 2rem;
+      margin-top: 10px;
+      letter-spacing: -0.05em;
+    }
+    .status-card strong.status-good { color: var(--accent-success); }
+    .status-card strong.status-watch { color: var(--accent-warn); }
+    .status-card strong.status-risk { color: var(--accent-danger); }
+    .radar-wrap {
+      display: grid;
+      place-items: center;
+      padding: 8px 0 0;
+    }
+    .radar-label {
+      fill: var(--text-muted);
+      font-size: 11px;
+      text-anchor: middle;
+    }
+    .radar-grid {
+      fill: none;
+      stroke: rgba(17, 24, 39, 0.10);
+      stroke-width: 1;
+    }
+    .radar-shape {
+      fill: rgba(36, 83, 255, 0.16);
+      stroke: var(--accent-primary);
+      stroke-width: 2;
+    }
+    .recommendation-grid {
+      display: grid;
+      gap: 16px;
+    }
+    .recommendation-card {
+      padding: 18px;
+    }
+    @media (max-width: 1080px) {
+      .profile-grid,
+      .stats-grid,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="topbar">
+    <div class="title-block">
+      <h1>마이페이지</h1>
+      <p>풀이 수, 시도 수, 영역별 상태, 약점 랭킹과 추천 문제를 한 화면에서 봅니다.</p>
+    </div>
+    <div class="badge status-{{ profile.report.status|lower }}">현재 상태 {{ profile.report.status }}</div>
+  </div>
+
+  <section class="stats-grid">
+    <article class="panel stat-card">
+      <span class="muted">푼 문제 수</span>
+      <strong>{{ profile.report.solved_count }}</strong>
+    </article>
+    <article class="panel stat-card">
+      <span class="muted">시도한 문제 수</span>
+      <strong>{{ profile.report.attempted_count }}</strong>
+    </article>
+    <article class="panel stat-card status-card">
+      <span class="muted">종합 상태</span>
+      <strong class="status-{{ profile.report.status|lower }}">{{ profile.report.status }}</strong>
+    </article>
+  </section>
+
+  <section class="profile-grid" style="margin-top: 20px;">
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">영역별 분석</h2>
+          <p class="panel-copy">자료구조, 탐색, 수학, 구현, 정렬 기준 오각형입니다.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="radar-wrap">
+          <svg width="320" height="320" viewBox="0 0 300 300" role="img" aria-label="영역별 상태">
+            {% for level in profile.radar.grid_polygons %}
+              <polygon class="radar-grid" points="{{ level.points }}" />
+            {% endfor %}
+            <polygon class="radar-shape" points="{{ profile.radar.points }}" />
+            {% for item in profile.radar.labels %}
+              <text class="radar-label" x="{{ item.x }}" y="{{ item.y }}">{{ item.label }}</text>
+            {% endfor %}
+          </svg>
+        </div>
+        <div class="grid">
+          {% for item in profile.radar.metrics %}
+            <div class="chip">{{ item.label }} {{ item.value }}점</div>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+
+    <article class="grid">
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">AI 종합 분석</h2>
+            <p class="panel-copy">내부 기준 Good / Watch / Risk 상태입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="badge status-{{ profile.report.status|lower }}">{{ profile.report.status }}</div>
+          <p style="margin: 14px 0 0;">{{ profile.report.ai_summary }}</p>
+          <div class="grid" style="margin-top: 16px;">
+            {% for rule in profile.status_rules %}
+              <div class="chip">{{ rule }}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-header">
+          <div>
+            <h2 class="panel-title">약점 랭킹</h2>
+            <p class="panel-copy">내부 점수 기준 상위 약점입니다.</p>
+          </div>
+        </div>
+        <div class="panel-body">
+          {% if profile.report.weak_topic_ranking %}
+            <table>
+              <thead>
+                <tr>
+                  <th>토픽</th>
+                  <th>점수</th>
+                  <th>풀이 비율</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in profile.report.weak_topic_ranking %}
+                  <tr>
+                    <td>{{ item.topic }}</td>
+                    <td>{{ item.score }}</td>
+                    <td>{{ (item.solved_ratio * 100)|round|int }}%</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="empty-state">약점 랭킹을 만들 데이터가 없습니다.</div>
+          {% endif %}
+        </div>
+      </article>
+    </article>
+  </section>
+
+  <section class="grid grid-2" style="grid-template-columns: 1fr 1fr; margin-top: 20px;">
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">영역별 상세</h2>
+          <p class="panel-copy">도메인별 상태와 solved 비율입니다.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        <table>
+          <thead>
+            <tr>
+              <th>영역</th>
+              <th>상태</th>
+              <th>총 문제</th>
+              <th>풀이 비율</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in profile.report.domain_analysis %}
+              <tr>
+                <td>{{ item.name }}</td>
+                <td>
+                  <span class="badge {% if item.status == '강점' %}status-good{% else %}status-watch{% endif %}">
+                    {{ item.status }}
+                  </span>
+                </td>
+                <td>{{ item.total }}</td>
+                <td>{{ (item.solved_ratio * 100)|round|int }}%</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">추천 문제</h2>
+          <p class="panel-copy">백준, LeetCode, 프로그래머스 링크입니다.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if profile.report.recommendations %}
+          <div class="recommendation-grid">
+            {% for item in profile.report.recommendations %}
+              <article class="panel recommendation-card">
+                <strong>{{ item.title }}</strong>
+                <p class="muted">{{ item.topic }} · {{ item.source }}</p>
+                <p class="muted">{{ item.reason }}</p>
+                <a class="button primary" href="{{ item.url }}" target="_blank" rel="noreferrer">문제 링크</a>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">추천 문제가 아직 없습니다.</div>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

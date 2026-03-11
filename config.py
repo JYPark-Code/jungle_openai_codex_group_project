@@ -13,6 +13,7 @@ class Config:
     GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
     GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
     GITHUB_REDIRECT_URI = os.getenv("GITHUB_REDIRECT_URI", "http://127.0.0.1:5000/api/auth/github/callback")
+    GITHUB_WEB_REDIRECT_URI = os.getenv("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5050/auth/github/callback")
     GITHUB_OAUTH_SCOPE = os.getenv("GITHUB_OAUTH_SCOPE", "read:user")
     FRONTEND_OAUTH_SUCCESS_URL = os.getenv("FRONTEND_OAUTH_SUCCESS_URL", "http://127.0.0.1:3000/auth/callback")
     FRONTEND_OAUTH_FAILURE_URL = os.getenv("FRONTEND_OAUTH_FAILURE_URL", "http://127.0.0.1:3000/login")
@@ -23,7 +24,7 @@ class Config:
     REPO_OWNER = os.getenv("REPO_OWNER", "")
     REPO_NAME = os.getenv("REPO_NAME", "")
     ACTIVE_WEEK = os.getenv("ACTIVE_WEEK", "")
-    DATABASE = None
+    DATABASE = os.getenv("DATABASE") or None
 
 
 class TestingConfig(Config):
@@ -34,6 +35,7 @@ class TestingConfig(Config):
     GITHUB_CLIENT_ID = "test-client-id"
     GITHUB_CLIENT_SECRET = "test-client-secret"
     GITHUB_REDIRECT_URI = "http://localhost/test/callback"
+    GITHUB_WEB_REDIRECT_URI = "http://localhost/test/web-callback"
     FRONTEND_OAUTH_SUCCESS_URL = "http://localhost:3000/auth/callback"
     FRONTEND_OAUTH_FAILURE_URL = "http://localhost:3000/login"
     CORS_ALLOWED_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
@@ -59,6 +61,10 @@ def apply_runtime_env(app) -> None:
         GITHUB_REDIRECT_URI=os.getenv(
             "GITHUB_REDIRECT_URI",
             app.config.get("GITHUB_REDIRECT_URI", "http://127.0.0.1:5000/api/auth/github/callback"),
+        ),
+        GITHUB_WEB_REDIRECT_URI=os.getenv(
+            "GITHUB_WEB_REDIRECT_URI",
+            app.config.get("GITHUB_WEB_REDIRECT_URI", "http://127.0.0.1:5050/auth/github/callback"),
         ),
         GITHUB_OAUTH_SCOPE=os.getenv(
             "GITHUB_OAUTH_SCOPE",

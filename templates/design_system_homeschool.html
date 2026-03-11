@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Homeschool Design System</title>
+    <style>
+      :root {
+        --bg: #efefef;
+        --shell: #cdcdcf;
+        --surface: #ffffff;
+        --surface-soft: #f7f7f8;
+        --surface-muted: #f1f2f4;
+        --sidebar: #050505;
+        --line: rgba(17, 24, 39, 0.1);
+        --line-strong: rgba(17, 24, 39, 0.16);
+        --text-strong: #111111;
+        --text-base: #262626;
+        --text-muted: #6f6f73;
+        --text-soft: #96979c;
+        --text-on-dark: #f5f7fb;
+        --accent-primary: #2453ff;
+        --accent-primary-soft: #edf2ff;
+        --accent-progress: #c146ff;
+        --accent-success: #53c27b;
+        --accent-warn: #ffb020;
+        --shadow-shell: 0 18px 40px rgba(17, 24, 39, 0.08);
+        --shadow-card: 0 4px 10px rgba(17, 24, 39, 0.04);
+        --radius-shell: 16px;
+        --radius-panel: 12px;
+        --radius-card: 10px;
+        --radius-pill: 10px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: Pretendard, "Apple SD Gothic Neo", "Avenir Next", "Nunito", sans-serif;
+        color: var(--text-base);
+        background: var(--bg);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .page {
+        max-width: 1360px;
+        margin: 0 auto;
+        padding: 24px 24px 40px;
+      }
+
+      .intro {
+        max-width: 720px;
+        margin-bottom: 28px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent-primary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: clamp(2.2rem, 4vw, 3.6rem);
+        line-height: 1.04;
+        letter-spacing: -0.05em;
+      }
+
+      .intro p {
+        margin: 14px 0 0;
+        color: var(--text-muted);
+        font-size: 1rem;
+        line-height: 1.75;
+      }
+
+      .shell {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-shell);
+        background: var(--shell);
+        box-shadow: var(--shadow-shell);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 160px minmax(0, 1fr) 220px;
+        min-height: 720px;
+        padding: 16px;
+      }
+
+      .sidebar {
+        padding: 16px 12px;
+        background: var(--sidebar);
+        border-right: 1px solid var(--line);
+        border-radius: 10px 0 0 10px;
+      }
+
+      .brand,
+      .profile-card,
+      .nav-link,
+      .course-card,
+      .task-row,
+      .mini-panel,
+      .token-card {
+        transition: transform 180ms ease-out, box-shadow 180ms ease-out, background-color 180ms ease-out;
+      }
+
+      .brand {
+        margin-bottom: 18px;
+        color: var(--text-on-dark);
+        font-size: 1rem;
+        font-weight: 700;
+      }
+
+      .brand span {
+        color: var(--accent-primary);
+      }
+
+      .profile-card {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #c8d4ff 0%, #2453ff 100%);
+      }
+
+      .profile-card strong,
+      .profile-card span {
+        display: block;
+      }
+
+      .profile-card strong {
+        color: var(--text-on-dark);
+        font-size: 0.86rem;
+      }
+
+      .profile-card span {
+        margin-top: 4px;
+        color: rgba(245, 247, 251, 0.62);
+        font-size: 0.74rem;
+      }
+
+      .nav {
+        display: grid;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .nav-title,
+      .section-label {
+        margin: 0 0 12px;
+        color: rgba(245, 247, 251, 0.42);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        color: rgba(245, 247, 251, 0.76);
+        font-size: 0.84rem;
+      }
+
+      .nav-link::before {
+        width: 6px;
+        height: 6px;
+        border-radius: 2px;
+        background: currentColor;
+        content: "";
+        opacity: 0.42;
+      }
+
+      .nav-link.active {
+        background: var(--accent-primary);
+        color: #fff;
+      }
+
+      .sidebar-note {
+        margin-top: 18px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .sidebar-note p {
+        margin: 8px 0 0;
+        color: rgba(245, 247, 251, 0.62);
+        font-size: 0.84rem;
+        line-height: 1.7;
+      }
+
+      .main {
+        padding: 16px;
+        border-right: 1px solid var(--line);
+        background: var(--surface-soft);
+      }
+
+      .topbar,
+      .aside-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .search {
+        width: min(280px, 100%);
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-pill);
+        background: var(--surface);
+        color: var(--text-muted);
+        font-size: 0.82rem;
+      }
+
+      .tiny-action {
+        color: var(--text-muted);
+        font-size: 0.82rem;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+
+      h2 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 1rem;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+
+      .panel-header p,
+      .tab-row {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 0.76rem;
+      }
+
+      .courses {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .course-card {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: var(--surface);
+        box-shadow: var(--shadow-card);
+      }
+
+      .course-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        margin-bottom: 14px;
+      }
+
+      .course-card h3 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 0.9rem;
+      }
+
+      .course-card p {
+        margin: 6px 0 10px;
+        color: var(--text-muted);
+        font-size: 0.78rem;
+      }
+
+      .course-link {
+        color: var(--accent-primary);
+        font-size: 0.76rem;
+        font-weight: 600;
+      }
+
+      .tab-row {
+        display: flex;
+        gap: 14px;
+      }
+
+      .tab-row .active {
+        color: var(--text-strong);
+        font-weight: 700;
+      }
+
+      .tasks {
+        display: grid;
+        gap: 8px;
+      }
+
+      .task-row {
+        display: grid;
+        grid-template-columns: 18px minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: var(--surface);
+      }
+
+      .task-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+      }
+
+      .task-copy strong,
+      .task-copy span {
+        display: block;
+      }
+
+      .task-copy strong {
+        color: var(--text-strong);
+        font-size: 0.84rem;
+      }
+
+      .task-copy span {
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 0.72rem;
+      }
+
+      .pill {
+        padding: 8px 10px;
+        border-radius: var(--radius-pill);
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+
+      .pill.primary {
+        background: var(--accent-primary-soft);
+        color: var(--accent-primary);
+        border: 1px solid rgba(36, 83, 255, 0.12);
+      }
+
+      .pill.soft {
+        background: #f3f4f6;
+        color: var(--text-muted);
+        border: 1px solid var(--line);
+      }
+
+      .aside {
+        padding: 16px;
+        background: var(--surface-soft);
+        border-radius: 0 10px 10px 0;
+      }
+
+      .profile-mini {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .profile-mini .avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+      }
+
+      .calendar-title {
+        margin: 18px 0 12px;
+        color: var(--text-strong);
+        font-size: 1rem;
+        line-height: 1.2;
+      }
+
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px 4px;
+        color: var(--text-muted);
+        font-size: 0.68rem;
+        text-align: center;
+      }
+
+      .calendar-grid strong {
+        color: var(--text-base);
+        font-weight: 600;
+      }
+
+      .calendar-grid .current {
+        width: 24px;
+        margin: 0 auto;
+        border-radius: 8px;
+        background: var(--accent-primary);
+        color: #fff;
+        line-height: 24px;
+      }
+
+      .calendar-grid .event {
+        width: 24px;
+        margin: 0 auto;
+        border: 1px solid rgba(36, 83, 255, 0.28);
+        border-radius: 8px;
+        line-height: 22px;
+        color: var(--accent-primary);
+      }
+
+      .mini-panel {
+        margin-top: 18px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: var(--surface);
+      }
+
+      .mini-panel h3,
+      .system h2 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 0.95rem;
+      }
+
+      .upcoming-item {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .upcoming-item:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .upcoming-item strong,
+      .upcoming-item span {
+        display: block;
+      }
+
+      .upcoming-item strong {
+        color: var(--text-strong);
+        font-size: 0.82rem;
+      }
+
+      .upcoming-item span {
+        margin-top: 4px;
+        color: var(--text-muted);
+        font-size: 0.71rem;
+        line-height: 1.5;
+      }
+
+      .bar {
+        width: 3px;
+        height: 34px;
+        border-radius: 2px;
+        background: var(--accent-primary);
+      }
+
+      .tag-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+      }
+
+      .system {
+        padding: 20px;
+        border-top: 1px solid var(--line);
+        background: var(--surface-muted);
+      }
+
+      .system-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr;
+        gap: 12px;
+        margin-top: 14px;
+      }
+
+      .token-card {
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-card);
+        background: var(--surface);
+      }
+
+      .token-card p {
+        margin: 10px 0 0;
+        color: var(--text-muted);
+        font-size: 0.84rem;
+        line-height: 1.7;
+      }
+
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .swatch {
+        padding: 12px;
+        border-radius: 8px;
+        color: var(--text-strong);
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .meta-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--text-muted);
+        font-size: 0.82rem;
+      }
+
+      .meta-row strong {
+        color: var(--text-strong);
+      }
+
+      .brand:hover,
+      .profile-card:hover,
+      .nav-link:hover,
+      .course-card:hover,
+      .task-row:hover,
+      .mini-panel:hover,
+      .token-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(17, 24, 39, 0.06);
+      }
+
+      @media (max-width: 1180px) {
+        .workspace {
+          grid-template-columns: 160px minmax(0, 1fr);
+        }
+
+        .aside {
+          grid-column: 1 / -1;
+          border-top: 1px solid var(--line);
+        }
+      }
+
+      @media (max-width: 860px) {
+        .page {
+          padding: 20px 16px 32px;
+        }
+
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar,
+        .main {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .courses,
+        .system-grid,
+        .swatches {
+          grid-template-columns: 1fr;
+        }
+
+        .task-row,
+        .upcoming-item {
+          grid-template-columns: 18px minmax(0, 1fr);
+        }
+
+        .pill,
+        .tag-icon {
+          grid-column: 2;
+          justify-self: start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="intro">
+        <p class="eyebrow">Design System</p>
+        <h1>Homeschool platform UI system with a cooler neutral base, thinner dividers, and restrained radii.</h1>
+        <p>
+          The layout stays dashboard-first, but the visual language now follows the newer reference more closely:
+          white and gray surfaces, dark navigation, sharper cards, and selective blue-led emphasis.
+        </p>
+      </section>
+
+      <section class="shell">
+        <div class="workspace">
+          <aside class="sidebar">
+            <div class="brand">Homeschool<span>.</span></div>
+            <div class="profile-card">
+              <div class="avatar"></div>
+              <div>
+                <strong>Institute of Sam</strong>
+                <span>First Semester</span>
+              </div>
+            </div>
+
+            <nav class="nav">
+              <p class="nav-title">Menu</p>
+              <a class="nav-link" href="#">Dashboard</a>
+              <a class="nav-link active" href="#">Weekly Plan</a>
+              <a class="nav-link" href="#">Lesson Plans</a>
+              <a class="nav-link" href="#">Activities</a>
+              <a class="nav-link" href="#">Assessment</a>
+              <p class="nav-title" style="margin-top: 18px;">Support</p>
+              <a class="nav-link" href="#">Resources</a>
+              <a class="nav-link" href="#">My Students</a>
+              <a class="nav-link" href="#">Logout</a>
+            </nav>
+
+            <div class="sidebar-note">
+              <strong>System intent</strong>
+              <p>Neutral canvases, thin separators, and only a few deliberate accent moments.</p>
+            </div>
+          </aside>
+
+          <section class="main">
+            <div class="topbar">
+              <h2>Dashboard</h2>
+              <div class="search">Week of July 28 - August 1</div>
+            </div>
+
+            <div class="stack">
+              <section>
+                <div class="panel-header">
+                  <p>Compact metric cards with thin outlines and blue-led emphasis.</p>
+                </div>
+                <div class="courses">
+                  <article class="course-card">
+                    <div class="course-icon" style="background: linear-gradient(135deg, #eff4ff 0%, #cedbff 100%);"></div>
+                    <h3>80%</h3>
+                    <p>Student Progress</p>
+                    <a class="course-link" href="#">View Summary</a>
+                  </article>
+                  <article class="course-card">
+                    <div class="course-icon" style="background: linear-gradient(135deg, #f7f8fb 0%, #dfe5f4 100%);"></div>
+                    <h3>80%</h3>
+                    <p>Total Activity</p>
+                    <a class="course-link" href="#">Open Detail</a>
+                  </article>
+                  <article class="course-card">
+                    <div class="course-icon" style="background: linear-gradient(135deg, #fff4d9 0%, #ffe7ac 100%);"></div>
+                    <h3>1h 39m</h3>
+                    <p>Total Time</p>
+                    <a class="course-link" href="#">See Report</a>
+                  </article>
+                </div>
+              </section>
+
+              <section>
+                <div class="panel-header">
+                  <h2>Today's Activity</h2>
+                  <div class="tab-row">
+                    <span class="active">Reading</span>
+                    <span>Math</span>
+                    <span>Print Activity</span>
+                  </div>
+                </div>
+                <div class="tasks">
+                  <article class="task-row">
+                    <div class="task-dot" style="background: var(--accent-success);"></div>
+                    <div class="task-copy">
+                      <strong>Reading Lesson 01</strong>
+                      <span>Vocabulary Practice • 15 minutes</span>
+                    </div>
+                    <div class="pill soft">Completed</div>
+                  </article>
+                  <article class="task-row">
+                    <div class="task-dot" style="background: var(--accent-warn);"></div>
+                    <div class="task-copy">
+                      <strong>Reading Lesson 01</strong>
+                      <span>Story Reading • 15 minutes</span>
+                    </div>
+                    <div class="pill soft">In Progress</div>
+                  </article>
+                  <article class="task-row">
+                    <div class="task-dot" style="background: var(--text-soft);"></div>
+                    <div class="task-copy">
+                      <strong>Math Lesson 01</strong>
+                      <span>Word Problems • 30 minutes</span>
+                    </div>
+                    <div class="pill primary">View Lesson</div>
+                  </article>
+                  <article class="task-row">
+                    <div class="task-dot" style="background: var(--text-soft);"></div>
+                    <div class="task-copy">
+                      <strong>Math Lesson 02</strong>
+                      <span>Shapes & Geometry • 20 minutes</span>
+                    </div>
+                    <div class="pill primary">View Lesson</div>
+                  </article>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <aside class="aside">
+            <div class="aside-top">
+              <div class="tiny-action">Jane Cooper • Grade 2</div>
+              <div class="profile-mini">
+                <div class="avatar"></div>
+              </div>
+            </div>
+
+            <h3 class="calendar-title">Weekly Focus</h3>
+            <div class="calendar-grid">
+              <strong>Mon</strong><strong>Tue</strong><strong>Wed</strong><strong>Thu</strong><strong>Fri</strong><strong>Sat</strong><strong>Sun</strong>
+              <span>29</span><span>30</span><span>31</span><span>1</span><span>2</span><span>3</span><span>4</span>
+              <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span>
+              <span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span class="current">17</span><span>18</span>
+              <span>19</span><span>20</span><span>21</span><span class="event">22</span><span>23</span><span>24</span><span>25</span>
+            </div>
+
+            <section class="mini-panel">
+              <h3>Upcoming</h3>
+              <article class="upcoming-item">
+                <div class="bar"></div>
+                <div>
+                  <strong>Math</strong>
+                  <span>Next grade path opens after subtraction module</span>
+                </div>
+                <div class="tag-icon" style="background: var(--accent-primary-soft);"></div>
+              </article>
+              <article class="upcoming-item">
+                <div class="bar" style="background: var(--accent-success);"></div>
+                <div>
+                  <strong>Reading</strong>
+                  <span>Comprehension set is ready for parent review</span>
+                </div>
+                <div class="tag-icon" style="background: rgba(83, 194, 123, 0.14);"></div>
+              </article>
+              <article class="upcoming-item">
+                <div class="bar" style="background: var(--accent-warn);"></div>
+                <div>
+                  <strong>Assessment</strong>
+                  <span>Print activity for Friday needs confirmation</span>
+                </div>
+                <div class="tag-icon" style="background: rgba(255, 176, 32, 0.14);"></div>
+              </article>
+            </section>
+          </aside>
+        </div>
+
+        <section class="system">
+          <h2>Foundation Tokens</h2>
+          <div class="system-grid">
+            <article class="token-card">
+              <p class="section-label">Palette</p>
+              <h3>Cool neutrals with selective blue and green</h3>
+              <div class="swatches">
+                <div class="swatch" style="background: #ffffff;">Surface</div>
+                <div class="swatch" style="background: #050505; color: #fff;">Sidebar</div>
+                <div class="swatch" style="background: #2453ff; color: #fff;">Primary</div>
+                <div class="swatch" style="background: #edf2ff;">Blue Tint</div>
+                <div class="swatch" style="background: #53c27b;">Success</div>
+                <div class="swatch" style="background: #f1f2f4;">Muted</div>
+              </div>
+              <p>Most surfaces stay neutral. Saturated color belongs in active navigation, chips, and progress only.</p>
+            </article>
+
+            <article class="token-card">
+              <p class="section-label">Typography</p>
+              <h3>Compact, sharp, and scan-oriented</h3>
+              <div class="meta-list">
+                <div class="meta-row"><span>Hero</span><strong>30px / 700</strong></div>
+                <div class="meta-row"><span>Section title</span><strong>16px / 700</strong></div>
+                <div class="meta-row"><span>Card title</span><strong>14px / 700</strong></div>
+                <div class="meta-row"><span>Body</span><strong>12px / 500</strong></div>
+              </div>
+              <p>Titles should read fast. Metadata stays tight and low-contrast without becoming faint.</p>
+            </article>
+
+            <article class="token-card">
+              <p class="section-label">Components</p>
+              <h3>Thin borders and reduced radius</h3>
+              <div class="meta-list">
+                <div class="meta-row"><span>Navigation</span><strong>36-40px, solid blue active</strong></div>
+                <div class="meta-row"><span>Cards</span><strong>10-12px radius</strong></div>
+                <div class="meta-row"><span>Dividers</span><strong>1px soft gray</strong></div>
+                <div class="meta-row"><span>Controls</span><strong>Blue tint, not full saturation</strong></div>
+              </div>
+              <p>The interface should feel precise and modern, without pill-heavy softness.</p>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

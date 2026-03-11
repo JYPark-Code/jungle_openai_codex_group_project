@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import csv
 import re
 from datetime import date, datetime, timedelta
@@ -188,7 +190,10 @@ def create_missing_issues(
 
 
 def normalize_title(title: str) -> str:
-    return re.sub(r"\s+", " ", title.strip()).casefold()
+    normalized = title.strip()
+    normalized = re.sub(r"^\[(week\s*\d+|week\d+|w\d+)\]\s*", "", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"^(week\s*\d+|week\d+|w\d+)\s*[-:]\s*", "", normalized, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", normalized).casefold()
 
 
 def classify_issue_title(title: str) -> str:

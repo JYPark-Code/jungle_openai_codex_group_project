@@ -1,0 +1,178 @@
+{% extends "web_app_base.html" %}
+
+{% block title %}커밋 리뷰{% endblock %}
+
+{% block head %}
+  <style>
+    .review-layout {
+      display: grid;
+      grid-template-columns: 0.82fr 1.18fr;
+      gap: 20px;
+    }
+    .commit-list {
+      display: grid;
+      gap: 12px;
+    }
+    .commit-item {
+      display: block;
+      padding: 18px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .commit-item.selected {
+      border-color: rgba(36, 83, 255, 0.24);
+      background: var(--accent-primary-soft);
+    }
+    .commit-item strong {
+      display: block;
+      color: var(--text-strong);
+      line-height: 1.55;
+    }
+    .detail-stack {
+      display: grid;
+      gap: 16px;
+    }
+    .detail-card {
+      padding: 18px;
+    }
+    @media (max-width: 1100px) {
+      .review-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="topbar">
+    <div class="title-block">
+      <h1>커밋 리뷰</h1>
+      <p>커밋 단위로 목록을 보고, 선택한 커밋에 대한 AI 리뷰와 코드 프리뷰를 확인합니다.</p>
+    </div>
+    <div class="chip">전체 {{ review_page.commits|length }}개 커밋</div>
+  </div>
+
+  <section class="review-layout">
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">커밋 목록</h2>
+          <p class="panel-copy">선택된 커밋은 배경색과 보더로 구분합니다.</p>
+        </div>
+      </div>
+      <div class="panel-body">
+        {% if review_page.commits %}
+          <div class="commit-list">
+            {% for item in review_page.commits %}
+              <a class="commit-item {% if item.is_selected %}selected{% endif %}" href="/app/reviews?sha={{ item.sha }}">
+                <strong>{{ item.message }}</strong>
+                <p class="muted">{{ item.sha[:7] }} · {{ item.author_name }} · 파일 {{ item.file_count }}개</p>
+                <p class="muted">{{ item.formatted_committed_at }}</p>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">동기화된 커밋이 없습니다. 먼저 대시보드에서 저장소 동기화를 실행하세요.</div>
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-title">선택한 커밋</h2>
+          <p class="panel-copy">AI 리뷰와 코드 프리뷰를 함께 보여줍니다.</p>
+        </div>
+        {% if review_page.selected %}
+          <form method="post" action="/app/reviews/{{ review_page.selected.commit.sha }}/generate">
+            <button class="button primary" type="submit">리뷰 생성 또는 갱신</button>
+          </form>
+        {% endif %}
+      </div>
+      <div class="panel-body">
+        {% if not review_page.selected %}
+          <div class="empty-state">왼쪽에서 커밋을 선택하세요.</div>
+        {% else %}
+          <div class="detail-stack">
+            <article class="panel detail-card">
+              <strong>{{ review_page.selected.commit.message }}</strong>
+              <p class="muted">{{ review_page.selected.commit.sha }} · {{ review_page.selected.commit.author_name }}</p>
+              <p class="muted">{{ review_page.selected.commit.formatted_committed_at }}</p>
+            </article>
+
+            {% if review_page.selected.review %}
+              <article class="panel detail-card">
+                <strong>AI 종합 리뷰</strong>
+                <p class="muted" style="margin-top: 10px;">{{ review_page.selected.review.review_summary }}</p>
+                <div class="grid" style="margin-top: 14px;">
+                  {% for comment in review_page.selected.review.review_comments %}
+                    <div class="chip">{{ comment }}</div>
+                  {% endfor %}
+                </div>
+              </article>
+
+              {% if review_page.selected.review.line_comments %}
+                <article class="panel detail-card">
+                  <strong>라인 단위 코멘트</strong>
+                  <div class="grid" style="margin-top: 14px;">
+                    {% for item in review_page.selected.review.line_comments %}
+                      <article class="panel detail-card">
+                        <strong>{{ item.title }}</strong>
+                        <p class="muted">{{ item.file_path }} · {{ item.start_line }}-{{ item.end_line }}줄</p>
+                        <p class="muted">{{ item.body }}</p>
+                        <pre>{{ item.snippet }}</pre>
+                      </article>
+                    {% endfor %}
+                  </div>
+                </article>
+              {% endif %}
+            {% else %}
+              <div class="empty-state">아직 저장된 AI 리뷰가 없습니다. 상단 버튼으로 생성하세요.</div>
+            {% endif %}
+
+            {% if review_page.selected.judge_result %}
+              <article class="panel detail-card">
+                <strong>문제 판정 결과</strong>
+                <p class="muted" style="margin-top: 10px;">
+                  시도 {{ review_page.selected.judge_result.attempted_count }}건,
+                  거의 해결 {{ review_page.selected.judge_result.possibly_solved_count }}건,
+                  해결 {{ review_page.selected.judge_result.solved_count }}건
+                </p>
+                {% if review_page.selected.judge_result.results %}
+                  <table style="margin-top: 14px;">
+                    <thead>
+                      <tr>
+                        <th>이슈</th>
+                        <th>파일</th>
+                        <th>판정</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for item in review_page.selected.judge_result.results %}
+                        <tr>
+                          <td>#{{ item.issue_number or "-" }}</td>
+                          <td>{{ item.file_path }}</td>
+                          <td>{{ item.judgement_status }}</td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                {% endif %}
+              </article>
+            {% endif %}
+
+            {% if review_page.selected.file_previews %}
+              {% for item in review_page.selected.file_previews %}
+                <article class="panel detail-card">
+                  <strong>{{ item.file_path }}</strong>
+                  <p class="muted" style="margin: 8px 0 12px;">총 {{ item.line_count }}줄 중 앞부분 프리뷰입니다.</p>
+                  <pre>{{ item.preview }}</pre>
+                </article>
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

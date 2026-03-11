@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>로그인</title>
+    <style>
+      :root {
+        --bg: #efefef;
+        --shell: transparent;
+        --surface: #ffffff;
+        --line: rgba(17, 24, 39, 0.1);
+        --text-strong: #111111;
+        --text-base: #262626;
+        --text-muted: #6f6f73;
+        --accent-primary: #2453ff;
+        --accent-primary-soft: #edf2ff;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: stretch;
+        padding: 0;
+        background: var(--bg);
+        color: var(--text-base);
+        font-family: Pretendard, "Apple SD Gothic Neo", sans-serif;
+      }
+      .wrap {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        min-height: 100vh;
+        overflow: hidden;
+        border: 0;
+        border-radius: 0;
+        background: var(--shell);
+        box-shadow: none;
+      }
+      .aside,
+      .main {
+        padding: 32px;
+      }
+      .aside {
+        background: #050505;
+        color: #f5f7fb;
+      }
+      .brand {
+        font-size: 1rem;
+        font-weight: 700;
+      }
+      .brand span { color: var(--accent-primary); }
+      .aside h1 {
+        margin: 28px 0 0;
+        font-size: 2.4rem;
+        line-height: 1.05;
+      }
+      .aside p {
+        color: rgba(245,247,251,0.68);
+        line-height: 1.8;
+      }
+      .mock {
+        display: grid;
+        gap: 12px;
+        margin-top: 28px;
+      }
+      .mock-card {
+        padding: 16px;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 0;
+        background: rgba(255,255,255,0.04);
+      }
+      .main {
+        background: #f7f7f8;
+      }
+      .eyebrow {
+        margin: 0 0 12px;
+        color: var(--accent-primary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+      .card {
+        max-width: 420px;
+        padding: 24px;
+        border: 1px solid var(--line);
+        border-radius: 0;
+        background: var(--surface);
+      }
+      .card h2 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 1.3rem;
+      }
+      .card p {
+        color: var(--text-muted);
+        line-height: 1.8;
+        font-size: 0.92rem;
+      }
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 0;
+        background: var(--accent-primary);
+        color: #fff;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-decoration: none;
+        border: 0;
+        cursor: pointer;
+      }
+      .cta.secondary {
+        margin-top: 10px;
+        background: var(--surface);
+        color: var(--text-base);
+        border: 1px solid var(--line);
+      }
+      .note {
+        margin-top: 16px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 0;
+        background: var(--accent-primary-soft);
+        color: var(--text-base);
+        font-size: 0.82rem;
+        line-height: 1.7;
+      }
+      .toast-stack {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 20;
+        display: grid;
+        gap: 10px;
+        width: min(360px, calc(100vw - 32px));
+      }
+      .toast {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        place-items: center;
+        background: rgba(239,239,239,0.72);
+      }
+      .loading-overlay.active {
+        display: grid;
+      }
+      .loading-card {
+        width: min(360px, calc(100vw - 32px));
+        padding: 22px;
+        border: 1px solid var(--line);
+        background: #fff;
+      }
+      .loading-bar {
+        position: relative;
+        height: 4px;
+        margin-top: 14px;
+        overflow: hidden;
+        background: #eef0f4;
+      }
+      .loading-bar::after {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 40%;
+        background: var(--accent-primary);
+        animation: loading-slide 1s ease-in-out infinite;
+        content: "";
+      }
+      @keyframes loading-slide {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(260%); }
+      }
+      @media (max-width: 900px) {
+        .wrap { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="toast-stack">
+          {% for category, message in messages %}
+            <div class="toast">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    <div class="loading-overlay" id="login-loading">
+      <div class="loading-card">
+        <strong>로그인 처리를 진행하고 있습니다.</strong>
+        <div class="loading-bar"></div>
+      </div>
+    </div>
+    <section class="wrap">
+      <aside class="aside">
+        <div class="brand">정글24<span>.</span></div>
+        <h1>GitHub OAuth로 바로 들어오는 알고리즘 학습 대시보드.</h1>
+        <p>로그인 후 저장소를 선택하면 이슈, 커밋, 약점 분석, 추천 문제를 같은 흐름 안에서 볼 수 있습니다.</p>
+        <div class="mock">
+          <div class="mock-card">Dashboard: 문제 진척도, 주차 보드, 추천 문제</div>
+          <div class="mock-card">Commit Review: 커밋별 AI 리뷰와 코드 프리뷰</div>
+          <div class="mock-card">My Page: 5개 영역 상태, 약점 랭킹, 종합 분석</div>
+        </div>
+      </aside>
+      <main class="main">
+        <p class="eyebrow">로그인 / 회원가입</p>
+        <div class="card">
+          <h2>GitHub 계정으로 시작</h2>
+          <p>이 서비스는 별도 회원가입 없이 GitHub OAuth로 로그인합니다. 로그인 후 분석할 저장소를 선택하고 바로 동기화할 수 있습니다.</p>
+          {% if error_message %}
+            <div class="note" style="margin-bottom: 12px; background: #fff3f3; color: #8b2d2d;">
+              {{ error_message }}
+            </div>
+          {% endif %}
+          {% if oauth_configured %}
+            <a class="cta" href="/auth/github/start">GitHub로 로그인 / 회원가입</a>
+          {% else %}
+            <div class="note">
+              OAuth 설정이 아직 없습니다. `.env`에 `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
+              `GITHUB_WEB_REDIRECT_URI`를 설정해야 실제 로그인 플로우가 동작합니다.
+            </div>
+          {% endif %}
+          {% if demo_mode %}
+            <form method="post" action="/auth/demo-login">
+              <button class="cta secondary" type="submit">데모로 둘러보기</button>
+            </form>
+          {% endif %}
+        </div>
+      </main>
+    </section>
+    <script>
+      (() => {
+        const overlay = document.getElementById("login-loading");
+        const showLoading = () => overlay.classList.add("active");
+
+        document.querySelectorAll("a[href], form").forEach((node) => {
+          if (node.tagName === "FORM") {
+            node.addEventListener("submit", showLoading);
+          } else {
+            node.addEventListener("click", (event) => {
+              if (node.target === "_blank") return;
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              showLoading();
+            });
+          }
+        });
+
+        setTimeout(() => {
+          document.querySelectorAll(".toast").forEach((toast) => {
+            toast.style.transition = "opacity 0.2s ease";
+            toast.style.opacity = "0";
+            setTimeout(() => toast.remove(), 220);
+          });
+        }, 2200);
+      })();
+    </script>
+  </body>
+</html>

@@ -14,7 +14,11 @@ from app.models.db import (
     update_commit_files,
 )
 from app.services.github_service import fetch_commit_changed_files
-from app.services.reporting_judgement_service import build_reporting_issue_entries, summarize_judgement_statuses
+from app.services.reporting_judgement_service import (
+    build_reporting_issue_entries,
+    normalize_commit_judgements_for_display,
+    summarize_judgement_statuses,
+)
 from app.utils.errors import ApiError
 
 
@@ -157,8 +161,13 @@ def get_commit_judge_result(repository_id: int, sha: str) -> dict:
     if not commit:
         raise ApiError("COMMIT_NOT_FOUND", "요청한 commit 정보를 찾을 수 없습니다.", 404)
 
-    judgements = get_problem_judgements_by_commit_id(commit["id"])
-    summary = summarize_judgements(judgements)
+    issues = get_issues_by_repository_id(repository_id)
+    judgements = normalize_commit_judgements_for_display(
+        get_problem_judgements_by_commit_id(commit["id"]),
+        issues,
+        match_issue_by_filename,
+    )
+    summary = summarize_judgement_statuses(judgements)
     return {
         "commit_sha": sha,
         "results": judgements,

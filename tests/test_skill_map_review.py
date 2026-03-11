@@ -256,6 +256,67 @@ def test_commit_review_generation(client, app, monkeypatch):
     assert payload["data"]["line_comments"]
 
 
+def test_commit_review_uses_project_done_status_in_file_context(client, app, monkeypatch):
+    repository_id, commit_id = ensure_review_context(app)
+    login_for_review(client, repository_id)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="project-done-review",
+            issue_number=1,
+            title="[WEEK2] 그래프 - BFS",
+            body="",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="Done",
+        )
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=1,
+            problem_key="graph bfs problem",
+            file_path="week2/graph_bfs.py",
+            judgement_status="attempted",
+            match_score=0.8,
+            matched_by_filename=True,
+        )
+
+    monkeypatch.setattr(
+        "app.services.code_review.fetch_commit_changed_files",
+        lambda owner, name, sha, access_token: {
+            "sha": sha,
+            "message": "add graph review target",
+            "author_name": "JYPark",
+            "committed_at": "2026-03-11T12:00:00Z",
+            "files": [
+                {
+                    "filename": "week2/graph_bfs.py",
+                    "status": "added",
+                    "additions": 20,
+                    "deletions": 0,
+                    "changes": 20,
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.code_review.fetch_file_content_at_ref",
+        lambda owner, name, file_path, ref, access_token: (
+            "from collections import deque\n"
+            "visited = set()\n"
+            "queue = deque([1])\n"
+        ),
+    )
+
+    response = client.post("/api/commits/review123/review")
+    payload = response.get_json()["data"]
+
+    assert response.status_code == 200
+    assert payload["files"][0]["issue_title"] == "[WEEK2] 그래프 - BFS"
+    assert payload["files"][0]["judgement_status"] == "solved"
+
+
 def test_review_and_skill_map_api_responses(client, app, monkeypatch):
     repository_id, commit_id = ensure_review_context(app)
     login_for_review(client, repository_id)

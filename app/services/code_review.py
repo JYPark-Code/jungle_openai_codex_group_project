@@ -325,12 +325,14 @@ def _resolve_issue_context(file_path: str, issues: list[dict], judgement_map: di
         match_score = matched.get("score", 0.0)
 
     judgement_status = judgement.get("judgement_status")
+    issue_title = judgement.get("problem_key")
     if matched_issue is not None:
         judgement_status = resolve_tracked_issue_status(matched_issue, judgement_status)
+        issue_title = matched_issue.get("title", issue_title)
 
     return {
         "issue_number": issue_number if issue_number is not None else (matched_issue or {}).get("issue_number"),
-        "issue_title": judgement.get("problem_key") or (matched_issue or {}).get("title"),
+        "issue_title": issue_title or (matched_issue or {}).get("title"),
         "judgement_status": judgement_status,
         "match_score": match_score,
     }

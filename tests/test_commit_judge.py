@@ -332,5 +332,51 @@ def test_repository_problem_summary_recovers_closed_issue_from_orphan_judgement(
     assert summary["total_count"] == 1
 
 
+def test_commit_judge_result_uses_project_done_as_solved(client, app, monkeypatch):
+    repository_id, _commit_id = ensure_commit_context(app)
+    login_with_repository_and_user(client, repository_id)
+
+    with app.app_context():
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="done-100",
+            issue_number=10,
+            title="문자열 광고 플래4",
+            body="문제 설명",
+            state="open",
+            github_created_at="2026-03-11T10:00:00Z",
+            project_status="Done",
+        )
+
+    monkeypatch.setattr(
+        "app.services.commit_judge_service.fetch_commit_changed_files",
+        lambda owner, name, sha, access_token: {
+            "sha": sha,
+            "message": "solve matched problem",
+            "author_name": "JYPark",
+            "committed_at": "2026-03-11T12:00:00Z",
+            "files": [
+                {
+                    "filename": "week2/문자열_광고_플래4.py",
+                    "status": "added",
+                    "additions": 10,
+                    "deletions": 0,
+                    "changes": 10,
+                }
+            ],
+        },
+    )
+
+    client.post("/api/commits/abc123/judge")
+    judge_result_response = client.get("/api/commits/abc123/judge-result")
+    payload = judge_result_response.get_json()["data"]
+
+    assert judge_result_response.status_code == 200
+    assert payload["attempted_count"] == 0
+    assert payload["possibly_solved_count"] == 0
+    assert payload["solved_count"] == 1
+    assert payload["results"][0]["judgement_status"] == "solved"
+
+
 def test_high_difficulty_filename_normalization():
     assert normalize_problem_filename("week2/난이도상_문자열_광고_플래4.py") == "문자열 광고"

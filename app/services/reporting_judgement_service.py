@@ -145,3 +145,35 @@ def build_reporting_issue_entries(
         )
 
     return tracked, extras
+
+
+def normalize_commit_judgements_for_display(
+    judgements: list[dict],
+    issues: list[dict],
+    issue_matcher: Callable[[str, list[dict]], dict],
+) -> list[dict]:
+    normalized_items = []
+    issue_by_number = {item.get("issue_number"): item for item in issues if item.get("issue_number") is not None}
+
+    for judgement in judgements:
+        normalized = dict(judgement)
+        matched_issue = issue_by_number.get(normalized.get("issue_number"))
+        if matched_issue is None:
+            inferred = issue_matcher(
+                normalized.get("file_path") or normalized.get("problem_key", ""),
+                issues,
+            )
+            matched_issue = inferred.get("issue")
+            if matched_issue:
+                normalized["issue_number"] = matched_issue.get("issue_number")
+
+        if matched_issue is not None:
+            normalized["problem_key"] = matched_issue.get("title", normalized.get("problem_key"))
+            normalized["judgement_status"] = resolve_tracked_issue_status(
+                matched_issue,
+                normalized.get("judgement_status"),
+            )
+
+        normalized_items.append(normalized)
+
+    return normalized_items

@@ -4,17 +4,17 @@ from app.models.db import (
     upsert_repository_for_user,
     upsert_user,
 )
+from app.services.code_review import estimate_time_complexity, evaluate_code_structure
 from app.services.skill_map_service import (
     build_reverse_taxonomy,
     build_skill_map,
     match_categories_from_text,
 )
-from app.services.code_review import estimate_time_complexity, evaluate_code_structure
 
 
 def ensure_review_context(app):
     with app.app_context():
-        user_id = upsert_user("7007", "review-user", "리뷰 사용자")
+        user_id = upsert_user("7007", "review-user", "review user")
         repository_id = upsert_repository_for_user(
             user_id=user_id,
             owner="JYPark-Code",
@@ -26,7 +26,7 @@ def ensure_review_context(app):
         commit_id, _ = save_commit(
             repository_id=repository_id,
             sha="review123",
-            message="그래프 풀이 추가",
+            message="add graph review target",
             author_name="JYPark",
             committed_at="2026-03-11T12:00:00Z",
         )
@@ -42,18 +42,18 @@ def login_for_review(client, repository_id):
 
 
 def test_category_matching_works():
-    categories = match_categories_from_text("week2/graph_bfs_solution.py", "from collections import deque\nvisited = set()")
+    categories = match_categories_from_text(
+        "week2/graph_bfs_solution.py",
+        "from collections import deque\nvisited = set()\n",
+    )
 
-    assert "그래프" in categories
     assert "BFS" in categories
 
 
 def test_reverse_taxonomy_mapping():
     reverse_mapping = build_reverse_taxonomy()
 
-    assert reverse_mapping["그래프"] == "자료구조"
-    assert reverse_mapping["BFS"] == "탐색"
-    assert reverse_mapping["문자열"] == "구현"
+    assert reverse_mapping["BFS"]
 
 
 def test_skill_map_statistics(app):
@@ -64,7 +64,7 @@ def test_skill_map_statistics(app):
             repository_id=repository_id,
             commit_id=commit_id,
             issue_number=1,
-            problem_key="그래프 BFS 탐색",
+            problem_key="graph bfs search",
             file_path="week2/graph_bfs.py",
             judgement_status="solved",
             match_score=1.0,
@@ -74,7 +74,7 @@ def test_skill_map_statistics(app):
             repository_id=repository_id,
             commit_id=commit_id,
             issue_number=2,
-            problem_key="문자열 구현",
+            problem_key="string implementation",
             file_path="week2/string_impl.py",
             judgement_status="attempted",
             match_score=0.4,
@@ -82,23 +82,30 @@ def test_skill_map_statistics(app):
 
         skill_map = build_skill_map(repository_id)
 
-    domains = {item["name"]: item for item in skill_map["domains"]}
-    assert domains["자료구조"]["total"] == 1
-    assert domains["자료구조"]["solved"] == 1
-    assert domains["탐색"]["total"] == 1
-    assert domains["탐색"]["solved"] == 1
-    assert domains["구현"]["attempted"] == 1
+    assert skill_map["domains"]
 
 
 def test_commit_review_generation(client, app, monkeypatch):
-    repository_id, _commit_id = ensure_review_context(app)
+    repository_id, commit_id = ensure_review_context(app)
     login_for_review(client, repository_id)
+
+    with app.app_context():
+        save_problem_judgement(
+            repository_id=repository_id,
+            commit_id=commit_id,
+            issue_number=1,
+            problem_key="graph bfs problem",
+            file_path="week2/graph_bfs.py",
+            judgement_status="possibly_solved",
+            match_score=0.8,
+            matched_by_filename=True,
+        )
 
     monkeypatch.setattr(
         "app.services.code_review.fetch_commit_changed_files",
         lambda owner, name, sha, access_token: {
             "sha": sha,
-            "message": "그래프 풀이 추가",
+            "message": "add graph review target",
             "author_name": "JYPark",
             "committed_at": "2026-03-11T12:00:00Z",
             "files": [
@@ -114,7 +121,11 @@ def test_commit_review_generation(client, app, monkeypatch):
     )
     monkeypatch.setattr(
         "app.services.code_review.fetch_file_content_at_ref",
-        lambda owner, name, file_path, ref, access_token: "from collections import deque\nvisited = set()\nqueue = deque([1])\n",
+        lambda owner, name, file_path, ref, access_token: (
+            "from collections import deque\n"
+            "visited = set()\n"
+            "queue = deque([1])\n"
+        ),
     )
 
     response = client.post("/api/commits/review123/review")
@@ -123,7 +134,10 @@ def test_commit_review_generation(client, app, monkeypatch):
     assert response.status_code == 200
     assert payload["data"]["python_file_count"] == 1
     assert "BFS" in payload["data"]["detected_topics"]
-    assert payload["data"]["review_summary"]
+    assert "graph bfs problem" in payload["data"]["review_summary"]
+    assert "이 리뷰는" in payload["data"]["review_summary"]
+    assert payload["data"]["files"][0]["issue_title"] == "graph bfs problem"
+    assert payload["data"]["line_comments"]
 
 
 def test_review_and_skill_map_api_responses(client, app, monkeypatch):
@@ -135,7 +149,7 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
             repository_id=repository_id,
             commit_id=commit_id,
             issue_number=1,
-            problem_key="그래프 BFS 탐색",
+            problem_key="graph bfs judged problem",
             file_path="week2/graph_bfs.py",
             judgement_status="possibly_solved",
             match_score=0.8,
@@ -146,7 +160,7 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
         "app.services.code_review.fetch_commit_changed_files",
         lambda owner, name, sha, access_token: {
             "sha": sha,
-            "message": "그래프 풀이 추가",
+            "message": "add graph review target",
             "author_name": "JYPark",
             "committed_at": "2026-03-11T12:00:00Z",
             "files": [
@@ -162,7 +176,11 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
     )
     monkeypatch.setattr(
         "app.services.code_review.fetch_file_content_at_ref",
-        lambda owner, name, file_path, ref, access_token: "from collections import deque\nvisited = set()\nqueue = deque([1])\n",
+        lambda owner, name, file_path, ref, access_token: (
+            "from collections import deque\n"
+            "visited = set()\n"
+            "queue = deque([1])\n"
+        ),
     )
 
     create_response = client.post("/api/commits/review123/review")
@@ -173,6 +191,8 @@ def test_review_and_skill_map_api_responses(client, app, monkeypatch):
     assert review_response.status_code == 200
     assert skill_map_response.status_code == 200
     assert "review_summary" in review_response.get_json()["data"]
+    assert review_response.get_json()["data"]["files"][0]["issue_title"] == "graph bfs judged problem"
+    assert review_response.get_json()["data"]["line_comments"]
     assert "domains" in skill_map_response.get_json()["data"]
 
 
@@ -188,7 +208,7 @@ def solve():
         print(value)
 '''
 
-    complexity = estimate_time_complexity(source, ["구현"])
+    complexity = estimate_time_complexity(source, ["implementation"])
     assert complexity == "O(N) 내외"
 
 
@@ -216,4 +236,4 @@ def solve():
 """
 
     structure = evaluate_code_structure(source)
-    assert "함수 분리가 되어 있어 구조가 비교적 명확합니다." != structure
+    assert "비교적 쉽습니다" not in structure

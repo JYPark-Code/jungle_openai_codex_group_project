@@ -216,3 +216,42 @@ def test_repository_sync_saves_project_status_from_tracked_project(client, app, 
         issues = get_issues_by_repository_id(repository_id)
 
     assert issues[0]["project_status"] == "Done"
+
+
+def test_save_issue_merges_duplicate_issue_numbers(app):
+    from app.models.db import get_issues_by_repository_id, save_issue, upsert_repository_for_user, upsert_user
+
+    with app.app_context():
+        user_id = upsert_user("4555", "dedupe-user", "dedupe user")
+        repository_id = upsert_repository_for_user(
+            user_id=user_id,
+            owner="JYPark-Code",
+            name="SW-AI-W02-05",
+            full_name="JYPark-Code/SW-AI-W02-05",
+            github_repo_id="4555",
+            default_branch="main",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="broken-hanoi",
+            issue_number=25,
+            title="[WEEK2] ???? - ??? ?",
+            body="",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+        save_issue(
+            repository_id=repository_id,
+            github_issue_id="123456789",
+            issue_number=25,
+            title="[WEEK2] 재귀함수 - 하노이 탑",
+            body="https://www.acmicpc.net/problem/1914",
+            state="closed",
+            github_created_at="2026-03-11T10:00:00Z",
+        )
+
+        issues = get_issues_by_repository_id(repository_id)
+
+    assert len(issues) == 1
+    assert issues[0]["issue_number"] == 25
+    assert issues[0]["title"] == "[WEEK2] 재귀함수 - 하노이 탑"

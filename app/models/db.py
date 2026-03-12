@@ -180,6 +180,7 @@ def init_db() -> None:
     connection.execute("PRAGMA foreign_keys = ON")
     connection.executescript(SCHEMA)
     _ensure_legacy_columns(connection)
+    _deduplicate_issue_rows(connection)
     connection.commit()
 
 
@@ -389,7 +390,7 @@ def get_latest_repository_by_user_id(user_id: int) -> dict | None:
 
 
 def get_issues_by_repository_id(repository_id: int) -> list[dict]:
-    return get_db().execute(
+    rows = get_db().execute(
         """
         SELECT
             id,
@@ -408,6 +409,7 @@ def get_issues_by_repository_id(repository_id: int) -> list[dict]:
         """,
         (repository_id,),
     ).fetchall()
+    return _deduplicate_issue_dicts(rows)
 
 
 def _ensure_legacy_columns(connection: sqlite3.Connection) -> None:
@@ -430,6 +432,136 @@ def _ensure_legacy_columns(connection: sqlite3.Connection) -> None:
     issue_column_names = {row["name"] for row in issue_rows}
     if "project_status" not in issue_column_names:
         connection.execute("ALTER TABLE issues ADD COLUMN project_status TEXT")
+
+
+def _deduplicate_issue_rows(connection: sqlite3.Connection) -> None:
+    duplicate_groups = connection.execute(
+        """
+        SELECT repository_id, issue_number
+        FROM issues
+        WHERE issue_number IS NOT NULL
+        GROUP BY repository_id, issue_number
+        HAVING COUNT(*) > 1
+        """
+    ).fetchall()
+
+    for group in duplicate_groups:
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                repository_id,
+                github_issue_id,
+                issue_number,
+                title,
+                body,
+                state,
+                project_status,
+                github_created_at,
+                created_at
+            FROM issues
+            WHERE repository_id = ? AND issue_number = ?
+            ORDER BY id ASC
+            """,
+            (group["repository_id"], group["issue_number"]),
+        ).fetchall()
+        if len(rows) < 2:
+            continue
+
+        merged_row = _merge_issue_rows(rows)
+        canonical_id = rows[0]["id"]
+        connection.execute(
+            """
+            UPDATE issues
+            SET github_issue_id = ?, issue_number = ?, title = ?, body = ?, state = ?, project_status = ?, github_created_at = ?
+            WHERE id = ?
+            """,
+            (
+                merged_row["github_issue_id"],
+                merged_row["issue_number"],
+                merged_row["title"],
+                merged_row["body"],
+                merged_row["state"],
+                merged_row["project_status"],
+                merged_row["github_created_at"],
+                canonical_id,
+            ),
+        )
+        duplicate_ids = [row["id"] for row in rows[1:]]
+        if duplicate_ids:
+            placeholders = ",".join("?" for _ in duplicate_ids)
+            connection.execute(f"DELETE FROM issues WHERE id IN ({placeholders})", duplicate_ids)
+
+
+def _deduplicate_issue_dicts(rows: list[dict]) -> list[dict]:
+    grouped = {}
+    ordered_keys = []
+    for row in rows:
+        key = row.get("issue_number")
+        if key is None:
+            key = ("row", row.get("id"))
+        if key not in grouped:
+            grouped[key] = []
+            ordered_keys.append(key)
+        grouped[key].append(row)
+
+    deduplicated = []
+    for key in ordered_keys:
+        items = grouped[key]
+        deduplicated.append(items[0] if len(items) == 1 else _merge_issue_rows(items))
+    return deduplicated
+
+
+def _merge_issue_rows(rows: list[dict]) -> dict:
+    preferred = max(rows, key=_issue_quality_score)
+    return {
+        "id": preferred.get("id"),
+        "repository_id": preferred.get("repository_id"),
+        "github_issue_id": _pick_issue_field(rows, "github_issue_id"),
+        "issue_number": preferred.get("issue_number"),
+        "title": _pick_issue_field(rows, "title"),
+        "body": _pick_issue_field(rows, "body"),
+        "state": _pick_issue_field(rows, "state"),
+        "project_status": _pick_issue_field(rows, "project_status"),
+        "github_created_at": _pick_issue_field(rows, "github_created_at"),
+        "created_at": preferred.get("created_at"),
+    }
+
+
+def _pick_issue_field(rows: list[dict], field_name: str) -> str | None:
+    sorted_rows = sorted(rows, key=_issue_quality_score, reverse=True)
+    for row in sorted_rows:
+        value = row.get(field_name)
+        if isinstance(value, str):
+            if value.strip():
+                return value
+        elif value is not None:
+            return value
+    return sorted_rows[0].get(field_name) if sorted_rows else None
+
+
+def _issue_quality_score(row: dict) -> tuple:
+    title = str(row.get("title", "") or "")
+    github_issue_id = str(row.get("github_issue_id", "") or "")
+    return (
+        0 if _is_garbled_title(title) else 1,
+        1 if title.strip() else 0,
+        1 if github_issue_id.isdigit() else 0,
+        1 if str(row.get("project_status", "") or "").strip() else 0,
+        1 if str(row.get("github_created_at", "") or "").strip() else 0,
+        -(row.get("id") or 0),
+    )
+
+
+def _is_garbled_title(title: str) -> bool:
+    stripped = (title or "").strip()
+    if not stripped:
+        return True
+    if "?" not in stripped:
+        return False
+    alpha_numeric_count = sum(1 for char in stripped if char.isalnum())
+    question_count = stripped.count("?")
+    return question_count >= max(3, alpha_numeric_count // 2)
 
 
 def record_issue_sync_result(
@@ -497,6 +629,69 @@ def save_issue(
         )
         connection.commit()
         return existing["id"], False
+
+    if issue_number is not None:
+        same_number_rows = connection.execute(
+            """
+            SELECT
+                id,
+                repository_id,
+                github_issue_id,
+                issue_number,
+                title,
+                body,
+                state,
+                project_status,
+                github_created_at,
+                created_at
+            FROM issues
+            WHERE repository_id = ? AND issue_number = ?
+            ORDER BY id ASC
+            """,
+            (repository_id, issue_number),
+        ).fetchall()
+        if same_number_rows:
+            merged_row = _merge_issue_rows(
+                same_number_rows
+                + [
+                    {
+                        "id": None,
+                        "repository_id": repository_id,
+                        "github_issue_id": github_issue_id,
+                        "issue_number": issue_number,
+                        "title": title,
+                        "body": body,
+                        "state": state,
+                        "project_status": project_status,
+                        "github_created_at": github_created_at,
+                        "created_at": now_iso(),
+                    }
+                ]
+            )
+            canonical_id = same_number_rows[0]["id"]
+            connection.execute(
+                """
+                UPDATE issues
+                SET github_issue_id = ?, issue_number = ?, title = ?, body = ?, state = ?, project_status = ?, github_created_at = ?
+                WHERE id = ?
+                """,
+                (
+                    merged_row["github_issue_id"],
+                    merged_row["issue_number"],
+                    merged_row["title"],
+                    merged_row["body"],
+                    merged_row["state"],
+                    merged_row["project_status"],
+                    merged_row["github_created_at"],
+                    canonical_id,
+                ),
+            )
+            duplicate_ids = [row["id"] for row in same_number_rows[1:]]
+            if duplicate_ids:
+                placeholders = ",".join("?" for _ in duplicate_ids)
+                connection.execute(f"DELETE FROM issues WHERE id IN ({placeholders})", duplicate_ids)
+            connection.commit()
+            return canonical_id, False
 
     cursor = connection.execute(
         """

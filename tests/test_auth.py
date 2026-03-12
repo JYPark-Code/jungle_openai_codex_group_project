@@ -1,5 +1,6 @@
 from urllib.parse import parse_qs, urlparse
 
+from app import create_app
 from app.models.db import get_user_by_github_user_id, upsert_repository_for_user, upsert_user
 from app.services.auth_service import handle_github_callback
 
@@ -32,7 +33,7 @@ def test_handle_github_callback_returns_token_and_user(monkeypatch):
         expected_state="same-state",
         client_id="client-id",
         client_secret="client-secret",
-        redirect_uri="http://localhost/callback",
+        redirect_uri="http://127.0.0.1/callback",
     )
 
     assert result["access_token"] == "access-token"
@@ -91,7 +92,7 @@ def test_github_login_redirect_mode_returns_github_redirect(client):
         "/api/auth/github/login",
         query_string={
             "mode": "redirect",
-            "next": "http://localhost:3000/auth/callback",
+            "next": "http://127.0.0.1:3000/auth/callback",
         },
     )
 
@@ -123,7 +124,7 @@ def test_github_callback_redirect_mode_redirects_to_frontend_success(client, mon
         "/api/auth/github/login",
         query_string={
             "mode": "redirect",
-            "next": "http://localhost:3000/auth/callback?from=github",
+            "next": "http://127.0.0.1:3000/auth/callback?from=github",
         },
     )
     state = parse_qs(urlparse(login_response.headers["Location"]).query)["state"][0]
@@ -137,7 +138,7 @@ def test_github_callback_redirect_mode_redirects_to_frontend_success(client, mon
     redirected_url = urlparse(callback_response.headers["Location"])
     query = parse_qs(redirected_url.query)
     assert redirected_url.scheme == "http"
-    assert redirected_url.netloc == "localhost:3000"
+    assert redirected_url.netloc == "127.0.0.1:3000"
     assert redirected_url.path == "/auth/callback"
     assert query["status"] == ["success"]
     assert query["from"] == ["github"]
@@ -148,7 +149,7 @@ def test_github_callback_redirect_mode_redirects_to_frontend_failure(client):
         "/api/auth/github/login",
         query_string={
             "mode": "redirect",
-            "next": "http://localhost:3000/auth/callback",
+            "next": "http://127.0.0.1:3000/auth/callback",
         },
     )
     state = parse_qs(urlparse(login_response.headers["Location"]).query)["state"][0]
@@ -170,14 +171,34 @@ def test_auth_cors_allows_frontend_origin(client):
     response = client.options(
         "/api/auth/me",
         headers={
-            "Origin": "http://localhost:3000",
+            "Origin": "http://127.0.0.1:3000",
             "Access-Control-Request-Method": "GET",
         },
     )
 
     assert response.status_code == 200
-    assert response.headers["Access-Control-Allow-Origin"] == "http://localhost:3000"
+    assert response.headers["Access-Control-Allow-Origin"] == "http://127.0.0.1:3000"
     assert response.headers["Access-Control-Allow-Credentials"] == "true"
+
+
+def test_localhost_requests_redirect_to_loopback(tmp_path):
+    app = create_app(
+        "config.TestingConfig",
+        {
+            "TESTING": False,
+            "DATABASE": str(tmp_path / "redirect.sqlite3"),
+        },
+    )
+    client = app.test_client()
+
+    response = client.get(
+        "/login",
+        base_url="http://localhost:5000",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["Location"] == "http://127.0.0.1:5000/login"
 
 
 def test_relogin_restores_current_repository_from_db(client, app, monkeypatch):

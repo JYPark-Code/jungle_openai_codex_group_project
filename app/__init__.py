@@ -1,7 +1,8 @@
 import os
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, redirect, request
 from flask_cors import CORS
 
 from config import Config, apply_runtime_env
@@ -44,6 +45,28 @@ def create_app(config_object=None, config_overrides=None):
             app,
             supports_credentials=True,
             resources={r"/api/*": {"origins": allowed_origins}},
+        )
+
+    @app.before_request
+    def redirect_localhost_to_loopback():
+        if app.testing:
+            return None
+        parsed_url = urlsplit(request.url)
+        if parsed_url.hostname != "localhost":
+            return None
+        port_suffix = f":{parsed_url.port}" if parsed_url.port else ""
+        normalized_netloc = f"127.0.0.1{port_suffix}"
+        return redirect(
+            urlunsplit(
+                (
+                    parsed_url.scheme,
+                    normalized_netloc,
+                    parsed_url.path,
+                    parsed_url.query,
+                    parsed_url.fragment,
+                )
+            ),
+            code=307,
         )
 
     init_db_app(app)

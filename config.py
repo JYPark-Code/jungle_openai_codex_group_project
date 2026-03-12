@@ -16,10 +16,7 @@ class Config:
     GITHUB_OAUTH_SCOPE = os.getenv("GITHUB_OAUTH_SCOPE", "read:user")
     FRONTEND_OAUTH_SUCCESS_URL = os.getenv("FRONTEND_OAUTH_SUCCESS_URL", "http://127.0.0.1:3000/auth/callback")
     FRONTEND_OAUTH_FAILURE_URL = os.getenv("FRONTEND_OAUTH_FAILURE_URL", "http://127.0.0.1:3000/login")
-    CORS_ALLOWED_ORIGINS = os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000",
-    )
+    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:3000")
     REPO_OWNER = os.getenv("REPO_OWNER", "")
     REPO_NAME = os.getenv("REPO_NAME", "")
     ACTIVE_WEEK = os.getenv("ACTIVE_WEEK", "")
@@ -33,10 +30,10 @@ class TestingConfig(Config):
     GITHUB_TOKEN = "test-token"
     GITHUB_CLIENT_ID = "test-client-id"
     GITHUB_CLIENT_SECRET = "test-client-secret"
-    GITHUB_REDIRECT_URI = "http://localhost/test/callback"
-    FRONTEND_OAUTH_SUCCESS_URL = "http://localhost:3000/auth/callback"
-    FRONTEND_OAUTH_FAILURE_URL = "http://localhost:3000/login"
-    CORS_ALLOWED_ORIGINS = "http://localhost:3000,http://127.0.0.1:3000"
+    GITHUB_REDIRECT_URI = "http://127.0.0.1/test/callback"
+    FRONTEND_OAUTH_SUCCESS_URL = "http://127.0.0.1:3000/auth/callback"
+    FRONTEND_OAUTH_FAILURE_URL = "http://127.0.0.1:3000/login"
+    CORS_ALLOWED_ORIGINS = "http://127.0.0.1:3000"
     REPO_OWNER = "test-owner"
     REPO_NAME = "test-repo"
     ACTIVE_WEEK = ""
@@ -74,7 +71,7 @@ def apply_runtime_env(app) -> None:
         ),
         CORS_ALLOWED_ORIGINS=os.getenv(
             "CORS_ALLOWED_ORIGINS",
-            app.config.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"),
+            app.config.get("CORS_ALLOWED_ORIGINS", "http://127.0.0.1:3000"),
         ),
         REPO_OWNER=os.getenv("REPO_OWNER", app.config.get("REPO_OWNER", "")),
         REPO_NAME=os.getenv("REPO_NAME", app.config.get("REPO_NAME", "")),

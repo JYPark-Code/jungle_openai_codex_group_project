@@ -1,113 +1,123 @@
 # 정글 알고리즘 학습 대시보드
 
-GitHub 저장소의 이슈, 커밋, GitHub Project 상태를 바탕으로 알고리즘 학습 진행 현황을 시각화하는 Flask 기반 웹 애플리케이션입니다.
+## 1. 프로젝트 한 줄 소개
 
-발표 시연에서는 다음 흐름을 한 번에 보여줄 수 있습니다.
+GitHub 저장소의 `Issues`, `Commits`, `Project 상태`를 기반으로 알고리즘 학습 진행 상황을 자동으로 분석하고 시각화하는 웹 서비스입니다.
 
-1. GitHub OAuth 로그인
-2. 분석 대상 저장소 선택
-3. 이슈/커밋/Project 상태 동기화
-4. 대시보드와 마이페이지에서 학습 통계 확인
-5. 커밋 리뷰에서 문제 추적 결과와 코드 리뷰 확인
+## 2. 문제 정의
 
-## 핵심 기능
+기존 알고리즘 스터디에서는 이런 불편이 있었습니다.
+
+- 어떤 문제를 풀었는지 한눈에 보기 어렵다.
+- 커밋은 남아 있어도 실제 진행 상황과 연결되지 않는다.
+- GitHub Project의 `To-do`, `In Progress`, `Done` 상태가 통계에 바로 반영되지 않는다.
+- 내가 어떤 영역이 약한지, 다음에 무엇을 풀어야 하는지 정리하기 어렵다.
+
+## 3. 해결 아이디어
+
+이 프로젝트는 GitHub 활동 데이터를 학습 대시보드로 연결합니다.
+
+- GitHub OAuth로 로그인
+- 저장소 선택 후 이슈/커밋/Project 상태 동기화
+- 문제별 진행 상태를 `미해결 / 진행 중 / 해결`로 정리
+- 영역별 통계와 약점 랭킹 생성
+- 추천 문제와 커밋 리뷰까지 한 화면에서 제공
+
+## 4. 핵심 기능
 
 - GitHub OAuth 로그인
-- 분석 대상 저장소 선택 및 세션 유지
+- 저장소 선택 및 세션 유지
 - GitHub Issues / Commits 동기화
 - GitHub Project 상태 연동
-- 커밋 기준 문제 추적과 판정 요약
-- 영역별 통계, 약점 랭킹, 추천 문제 제공
-- 커밋 리뷰 및 파일별 리뷰 코멘트 확인
+- 대시보드 / 마이페이지 / 커밋 리뷰 화면 제공
+- 문제 추적 결과와 코드 리뷰 요약 제공
+- 약점 랭킹 및 추천 문제 생성
 
-## 현재 반영된 주요 기준
+## 5. 이번 시연에서 강조한 포인트
 
-- 통계는 GitHub Project 상태를 최우선으로 반영합니다.
-- `Done`은 해결, `In Progress`는 진행 중, `To-do`는 미해결로 처리합니다.
-- 커밋 리뷰의 문제 추적 결과도 같은 기준을 따르도록 맞춰져 있습니다.
-- `localhost`와 `127.0.0.1` 혼용으로 인한 OAuth `state mismatch`를 막기 위해 로컬 실행 기준 호스트를 `127.0.0.1`로 통일했습니다.
+### Project 상태를 통계의 기준으로 사용
 
-## 기술 스택
+- `Done` -> 해결
+- `In Progress` -> 진행 중
+- `To-do` -> 미해결
+
+즉, 사용자가 GitHub Project에서 관리하는 실제 학습 상태가 통계에 직접 반영됩니다.
+
+### 커밋 리뷰와 통계 기준 일치
+
+- 대시보드 통계
+- 약점 랭킹
+- 문제 추적 결과
+- 커밋 리뷰 표시
+
+위 화면들이 서로 다른 기준이 아니라 같은 상태 기준을 따르도록 맞췄습니다.
+
+### 중복/깨진 이슈 데이터 정리
+
+- 같은 `issue_number`가 중복 저장되는 문제를 정리
+- 깨진 제목이 FE에 노출되는 문제를 방지
+- 로컬 환경에서 `localhost` / `127.0.0.1` 혼용으로 발생하던 OAuth 오류도 정리
+
+## 6. 시연 흐름
+
+1. 로그인
+2. 분석할 GitHub 저장소 선택
+3. 이슈/커밋/Project 상태 동기화
+4. 대시보드에서 전체 진행 현황 확인
+5. 마이페이지에서 영역별 통계와 약점 랭킹 확인
+6. 커밋 리뷰에서 문제 추적 결과와 리뷰 확인
+
+## 7. 기술 스택
 
 - Backend: Flask
 - Database: SQLite
 - Auth: GitHub OAuth
 - Test: pytest
 
-## 로컬 실행
+## 8. 실행 방법
 
 ```bash
 python -m pip install -r requirements.txt
 python run.py
 ```
 
-기본 접속 주소:
+접속 주소:
 
-- 웹 앱: [http://127.0.0.1:5000/login](http://127.0.0.1:5000/login)
-- API 기준 주소: [http://127.0.0.1:5000](http://127.0.0.1:5000)
+- 웹: [http://127.0.0.1:5000/login](http://127.0.0.1:5000/login)
+- API: [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
-## 환경 변수
+## 9. 로컬 실행 주의사항
 
-`.env.example`을 복사해 `.env`를 만든 뒤 값을 채워서 사용합니다.
+- OAuth callback과 실제 접속 주소는 `127.0.0.1`로 통일하는 것을 권장합니다.
+- `localhost`와 `127.0.0.1`을 혼용하면 세션 쿠키가 달라져 로그인 오류가 날 수 있습니다.
 
-```env
-SECRET_KEY=change-me-for-local-dev
+예시 callback URL:
 
-GITHUB_CLIENT_ID=your_github_oauth_client_id
-GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
-GITHUB_REDIRECT_URI=http://127.0.0.1:5000/auth/github/callback
-GITHUB_OAUTH_SCOPE=read:user
+- `http://127.0.0.1:5000/auth/github/callback`
 
-FRONTEND_OAUTH_SUCCESS_URL=http://127.0.0.1:3000/auth/callback
-FRONTEND_OAUTH_FAILURE_URL=http://127.0.0.1:3000/login
-CORS_ALLOWED_ORIGINS=http://127.0.0.1:3000
-
-SESSION_COOKIE_SAMESITE=Lax
-SESSION_COOKIE_SECURE=false
-
-GITHUB_TOKEN=optional_github_token
-REPO_OWNER=JYPark-Code
-REPO_NAME=SW-AI-W02-05
-```
-
-## GitHub OAuth 설정
-
-GitHub OAuth App에서 아래처럼 맞추면 됩니다.
-
-- Homepage URL: `http://127.0.0.1:5000/login` 또는 프런트 앱 주소
-- Authorization callback URL: `http://127.0.0.1:5000/auth/github/callback`
-
-주의:
-
-- 로컬 시연 시 `localhost` 대신 `127.0.0.1`로 접속하는 것을 권장합니다.
-- OAuth callback URL과 실제 접속 호스트가 섞이면 로그인 세션이 끊길 수 있습니다.
-
-## 발표 시연 추천 흐름
-
-1. `http://127.0.0.1:5000/login` 접속
-2. GitHub 로그인
-3. 저장소 선택
-4. 동기화 실행
-5. 대시보드에서 전체 진행 상황 확인
-6. 마이페이지에서 영역별 상세, 약점 랭킹, 추천 문제 확인
-7. 커밋 리뷰에서 문제 추적 결과와 리뷰 내용 확인
-
-## 배포 관련 메모
-
-- 현재 구조는 `Flask + SQLite` 기반이므로 가장 안정적인 시연 방식은 로컬 실행입니다.
-- 발표용 단기 데모 배포는 가능하지만, 운영 환경에서는 SQLite보다 Postgres 같은 서버형 DB가 더 적합합니다.
-- OAuth UX를 안정적으로 제공하려면 배포 환경에서도 고정된 도메인과 callback URL을 사용하는 것이 좋습니다.
-
-## 테스트
+## 10. 테스트
 
 ```bash
 python -m pytest -q
 ```
 
-현재 기준 전체 테스트 통과:
+현재 기준 전체 테스트:
 
 - `92 passed`
 
-## 문서
+## 11. 한계와 확장 방향
 
-- API 문서: `API_REFERENCE.md`
+현재는 로컬 시연 기준으로 `Flask + SQLite` 구조를 사용하고 있습니다.
+
+향후에는 아래 방향으로 확장할 수 있습니다.
+
+- SQLite에서 Postgres로 전환
+- 서버형 배포 환경 구축
+- 더 정교한 문제 매칭 규칙 추가
+- 추천 로직과 리뷰 품질 고도화
+
+## 12. 기대 효과
+
+- 스터디 진행 상황을 정량적으로 확인할 수 있다.
+- GitHub 활동과 학습 성과를 자연스럽게 연결할 수 있다.
+- 약점 영역을 빠르게 파악하고 다음 학습 방향을 정할 수 있다.
